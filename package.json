@@ -1,0 +1,95 @@
+{
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "plugma dev",
+		"build": "plugma build",
+		"preview": "plugma preview",
+		"release": "plugma release"
+	},
+	"dependencies": {
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.13.0",
+		"@figma/plugin-typings": "^1.100.2",
+		"@types/node": "^20.14.10",
+		"@types/react": "^18.3.12",
+		"@types/react-dom": "^18.3.1",
+		"@vitejs/plugin-react": "^4.3.3",
+		"eslint": "^9.13.0",
+		"eslint-plugin-react-hooks": "^5.0.0",
+		"eslint-plugin-react-refresh": "^0.4.14",
+		"globals": "^15.11.0",
+		"plugma": "^1.2.10",
+		"typescript": "~5.6.2",
+		"typescript-eslint": "^8.11.0",
+		"vite": "^5.4.10",
+		"vite-plugin-copy": "^0.1.6",
+		"vite-plugin-static-copy": "^3.1.1"
+	},
+	"plugma": {
+		"manifest": {
+			"id": "figmation-plugin",
+			"name": "Figmation",
+			"main": "src/main.ts",
+			"ui": "src/ui.tsx",
+			"menu": [
+				{
+					"name": "Figmation",
+					"command": "figmation"
+				}
+			],
+			"editorType": [
+				"figma",
+				"dev"
+			],
+			"capabilities": [
+				"inspect",
+				"codegen"
+			],
+			"codegenLanguages": [
+				{
+					"label": "React",
+					"value": "react"
+				},
+				{
+					"label": "HTML/CSS",
+					"value": "html"
+				}
+			],
+			"networkAccess": {
+				"allowedDomains": [
+					"ws://localhost:3055",
+					"ws://localhost:3056",
+					"ws://localhost:3057",
+					"ws://localhost:3058",
+					"ws://localhost:3059",
+					"ws://localhost:3060",
+					"https://www.billboard.com",
+					"https://images.unsplash.com",
+					"https://picsum.photos",
+					"https://via.placeholder.com",
+					"https://httpbin.org"
+				],
+				"devAllowedDomains": [
+					"http://localhost:*",
+					"ws://localhost:3055",
+					"ws://localhost:3056",
+					"ws://localhost:3057",
+					"ws://localhost:3058",
+					"ws://localhost:3059",
+					"ws://localhost:3060",
+					"https://www.billboard.com",
+					"https://images.unsplash.com",
+					"https://picsum.photos",
+					"https://via.placeholder.com",
+					"https://httpbin.org",
+					"http://httpbin.org"
+				],
+				"reasoning": "This plugin needs to connect to local WebSocket servers for n8n workflow automation, real-time communication with external automation tools, and load images from common external URLs for the create_image_from_url functionality."
+			}
+		}
+	}
+}

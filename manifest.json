@@ -1,0 +1,57 @@
+{
+  "api": "1.0.0",
+  "id": "figmation-plugin",
+  "name": "Figmation - Figma Design Automation",
+  "main": "src/main.ts",
+  "ui": "src/ui.tsx",
+  "menu": [
+    {
+      "name": "Figmation Design Automation",
+      "command": "figmation"
+    }
+  ],
+  "editorType": [
+    "figma",
+    "dev"
+  ],
+  "capabilities": [
+    "inspect",
+    "codegen"
+  ],
+  "codegenLanguages": [
+    {
+      "label": "React",
+      "value": "react"
+    },
+    {
+      "label": "HTML/CSS",
+      "value": "html"
+    }
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "ws://localhost:3055",
+      "ws://localhost:3056", 
+      "ws://localhost:3057",
+      "ws://localhost:3058",
+      "ws://localhost:3059",
+      "ws://localhost:3060",
+      "https://images.unsplash.com",
+      "https://picsum.photos",
+      "https://via.placeholder.com"
+    ],
+    "devAllowedDomains": [
+      "http://localhost:6188",
+      "ws://localhost:3055",
+      "ws://localhost:3056",
+      "ws://localhost:3057", 
+      "ws://localhost:3058",
+      "ws://localhost:3059",
+      "ws://localhost:3060",
+      "https://images.unsplash.com",
+      "https://picsum.photos",
+      "https://via.placeholder.com"
+    ],
+    "reasoning": "This plugin connects to local WebSocket servers (ports 3055-3060) for secure communication with n8n workflow automation systems. Image URLs are used exclusively for the create_image_from_url functionality to demonstrate design automation capabilities with placeholder images from trusted sources (Unsplash, Picsum, Placeholder.com). No personal data is transmitted or stored externally."
+  }
+}
