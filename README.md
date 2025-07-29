@@ -118,3 +118,9 @@ MIT License
 ## Related Projects
 
 - [n8n-nodes-figmation](https://github.com/dandacompany/n8n-nodes-figmation): n8n custom nodes package
+
+## Acknowledgments
+
+This project was inspired by [Cursor Talk to Figma MCP](https://github.com/sonnylazuardi/cursor-talk-to-figma-mcp) by [@sonnylazuardi](https://github.com/sonnylazuardi). We extend our gratitude for the innovative MCP integration approach that enabled us to create an n8n workflow-compatible version for Figma automation.
+
+Special thanks to the original project for demonstrating the power of Model Context Protocol (MCP) in bridging AI tools with design workflows.
