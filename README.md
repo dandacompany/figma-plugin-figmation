@@ -107,6 +107,13 @@ case 'new_command':
 
 MIT License
 
+## Developer Information
+
+- **Name**: Dante
+- **Email**: datapod.k@gmail.com
+- **Company Homepage**: https://dante-datalab.com
+- **YouTube**: https://youtube.com/@단테랩스
+
 ## Related Projects
 
 - [n8n-nodes-figmation](https://github.com/dandacompany/n8n-nodes-figmation): n8n custom nodes package
