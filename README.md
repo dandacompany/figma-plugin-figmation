@@ -113,7 +113,7 @@ MIT License
 - **Company**: Dante Labs
 - **Email**: datapod.k@gmail.com
 - **Company Homepage**: https://dante-datalab.com
-- **YouTube**: https://youtube.com/@단테랩스
+- **YouTube**: https://youtube.com/@dante-labs
 
 ## Related Projects
 
