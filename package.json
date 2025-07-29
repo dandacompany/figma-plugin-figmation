@@ -1,6 +1,7 @@
 {
 	"private": true,
 	"type": "module",
+	"license": "MIT",
 	"scripts": {
 		"dev": "plugma dev",
 		"build": "plugma build",
