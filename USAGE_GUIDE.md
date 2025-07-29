@@ -1,58 +1,58 @@
-# FigmaConnector 노드 사용법 가이드
+# FigmaConnector Node Usage Guide
 
-## 개요
+## Overview
 
-FigmaConnector 노드는 n8n에서 Figma 플러그인과 실시간 통신을 위한 웹훅과 WebSocket 서버를 동시에 제공하는 노드입니다.
+The FigmaConnector node provides both webhook and WebSocket server functionality for real-time communication between n8n and Figma plugins.
 
-## 주요 기능
+## Key Features
 
-- **웹훅 엔드포인트**: HTTP POST 요청으로 Figma 명령 전송
-- **WebSocket 서버**: 실시간 양방향 통신
-- **채널 기반 통신**: 여러 프로젝트/플러그인을 구분하여 관리
-- **명령 전달**: 웹훅으로 받은 명령을 WebSocket을 통해 Figma 플러그인에 전달
+- **Webhook Endpoint**: Send Figma commands via HTTP POST requests
+- **WebSocket Server**: Real-time bidirectional communication
+- **Channel-based Communication**: Manage multiple projects/plugins separately
+- **Command Relay**: Relay commands received via webhook to Figma plugin through WebSocket
 
-## 설치 및 설정
+## Installation and Setup
 
-### 1. n8n 커스텀 노드 설치
+### 1. Install n8n Custom Nodes
 
 ```bash
 cd n8n-nodes-figma
 ./install.sh
 ```
 
-### 2. n8n 재시작
+### 2. Restart n8n
 
-n8n 인스턴스를 재시작하여 커스텀 노드를 로드합니다.
+Restart your n8n instance to load the custom nodes.
 
-### 3. 워크플로우 생성
+### 3. Create Workflow
 
-1. n8n에서 새 워크플로우 생성
-2. "Figma Connector" 노드 추가
-3. 노드 설정:
-   - **WebSocket Port**: 3055 (기본값)
-   - **WebSocket Host**: localhost (기본값)
-   - **Channel ID**: 원하는 채널 ID (예: "my-project")
-   - **Channel Name**: 채널 이름 (선택사항)
+1. Create a new workflow in n8n
+2. Add "Figma Connector" node
+3. Configure the node:
+   - **WebSocket Port**: 3055 (default)
+   - **WebSocket Host**: localhost (default)
+   - **Channel ID**: Desired channel ID (e.g., "my-project")
+   - **Channel Name**: Channel name (optional)
 
-### 4. 워크플로우 활성화
+### 4. Activate Workflow
 
-워크플로우를 활성화하면 자동으로:
-- WebSocket 서버가 시작됩니다 (ws://localhost:3055)
-- 웹훅 엔드포인트가 생성됩니다
-- 지정된 채널이 생성됩니다
+When you activate the workflow, it automatically:
+- Starts the WebSocket server (ws://localhost:3055)
+- Creates webhook endpoints
+- Creates the specified channel
 
-## Figma 플러그인 설정
+## Figma Plugin Configuration
 
-### 1. 플러그인 코드 수정
+### 1. Modify Plugin Code
 
-`src/main.ts`에서 WebSocket 연결 설정:
+Configure WebSocket connection in `src/main.ts`:
 
 ```typescript
-// WebSocket 연결 설정
+// WebSocket connection settings
 const wsUrl = 'ws://localhost:3055';
-const channelId = 'my-project'; // n8n에서 설정한 채널 ID와 동일하게
+const channelId = 'my-project'; // Same as channel ID set in n8n
 
-// 연결 시 채널에 조인
+// Join channel on connection
 const joinMessage = {
   type: 'join_channel',
   channelId: channelId,
@@ -60,10 +60,10 @@ const joinMessage = {
 };
 ```
 
-### 2. 명령 처리 함수 추가
+### 2. Add Command Handler Function
 
 ```typescript
-// 명령 처리 함수
+// Command handler function
 async function handleCommand(command, params) {
   switch (command) {
     case 'create_frame':
@@ -82,16 +82,16 @@ async function handleCommand(command, params) {
 }
 ```
 
-## 웹훅으로 명령 전송
+## Sending Commands via Webhook
 
-### 1. 웹훅 URL 확인
+### 1. Check Webhook URL
 
-n8n 워크플로우에서 Figma Connector 노드의 웹훅 URL을 확인합니다.
-예: `http://localhost:5678/webhook/figma-connector`
+Verify the webhook URL in the Figma Connector node in your n8n workflow.
+Example: `http://localhost:5678/webhook/figma-connector`
 
-### 2. 명령 전송 예시
+### 2. Command Examples
 
-#### create_frame 명령
+#### create_frame Command
 
 ```bash
 curl -X POST "http://localhost:5678/webhook/figma-connector" \
@@ -103,7 +103,7 @@ curl -X POST "http://localhost:5678/webhook/figma-connector" \
       "y": 100,
       "width": 400,
       "height": 300,
-      "name": "테스트 프레임",
+      "name": "Test Frame",
       "fillColor": {
         "r": 0.2,
         "g": 0.6,
@@ -115,7 +115,7 @@ curl -X POST "http://localhost:5678/webhook/figma-connector" \
   }'
 ```
 
-#### create_rectangle 명령
+#### create_rectangle Command
 
 ```bash
 curl -X POST "http://localhost:5678/webhook/figma-connector" \
@@ -138,7 +138,7 @@ curl -X POST "http://localhost:5678/webhook/figma-connector" \
   }'
 ```
 
-#### create_text 명령
+#### create_text Command
 
 ```bash
 curl -X POST "http://localhost:5678/webhook/figma-connector" \
@@ -148,7 +148,7 @@ curl -X POST "http://localhost:5678/webhook/figma-connector" \
     "params": {
       "x": 300,
       "y": 300,
-      "text": "안녕하세요! n8n에서 보낸 텍스트입니다.",
+      "text": "Hello! This text was sent from n8n.",
       "fontSize": 24,
       "fontColor": {
         "r": 0.0,
@@ -161,72 +161,72 @@ curl -X POST "http://localhost:5678/webhook/figma-connector" \
   }'
 ```
 
-### 3. 서버 상태 확인
+### 3. Check Server Status
 
 ```bash
 curl -X GET "http://localhost:5678/webhook/figma-connector" \
   -H "Content-Type: application/json"
 ```
 
-## 테스트 도구
+## Testing Tools
 
-### 1. JavaScript 테스터
+### 1. JavaScript Tester
 
 ```bash
 node test-webhook-command.js
 ```
 
-### 2. curl 스크립트
+### 2. curl Scripts
 
 ```bash
 ./test-curl-commands.sh
 ```
 
-## 지원하는 명령
+## Supported Commands
 
-### 기본 명령
+### Basic Commands
 
-- `create_frame`: 프레임 생성
-- `create_rectangle`: 사각형 생성
-- `create_text`: 텍스트 생성
-- `get_selection`: 선택된 요소 가져오기
-- `get_document_info`: 문서 정보 가져오기
+- `create_frame`: Create frame
+- `create_rectangle`: Create rectangle
+- `create_text`: Create text
+- `get_selection`: Get selected elements
+- `get_document_info`: Get document information
 
-### 고급 명령
+### Advanced Commands
 
-- `duplicate_selection`: 선택된 요소 복제
-- `delete_selection`: 선택된 요소 삭제
-- `export_selection`: 선택된 요소 내보내기
-- `move_node`: 노드 이동
-- `resize_node`: 노드 크기 조정
-- `set_fill_color`: 채우기 색상 설정
-- `set_stroke_color`: 테두리 색상 설정
+- `duplicate_selection`: Duplicate selected elements
+- `delete_selection`: Delete selected elements
+- `export_selection`: Export selected elements
+- `move_node`: Move node
+- `resize_node`: Resize node
+- `set_fill_color`: Set fill color
+- `set_stroke_color`: Set stroke color
 
-## 문제 해결
+## Troubleshooting
 
-### 1. WebSocket 연결 실패
+### 1. WebSocket Connection Failure
 
-- n8n 워크플로우가 활성화되어 있는지 확인
-- 포트 3055가 사용 가능한지 확인
-- 방화벽 설정 확인
+- Check if n8n workflow is activated
+- Verify port 3055 is available
+- Check firewall settings
 
-### 2. 웹훅 응답 없음
+### 2. No Webhook Response
 
-- 웹훅 URL이 올바른지 확인
-- Content-Type이 application/json인지 확인
-- 요청 본문이 올바른 JSON 형식인지 확인
+- Verify webhook URL is correct
+- Ensure Content-Type is application/json
+- Check if request body is valid JSON format
 
-### 3. 명령이 Figma에 전달되지 않음
+### 3. Commands Not Reaching Figma
 
-- Figma 플러그인이 WebSocket 서버에 연결되어 있는지 확인
-- 채널 ID가 일치하는지 확인
-- 플러그인에서 명령 처리 함수가 구현되어 있는지 확인
+- Check if Figma plugin is connected to WebSocket server
+- Verify channel ID matches
+- Ensure command handler functions are implemented in plugin
 
-## 로그 확인
+## Log Monitoring
 
-### n8n 로그
+### n8n Logs
 
-n8n 실행 시 콘솔에서 다음 로그를 확인할 수 있습니다:
+You can see the following logs in the console when running n8n:
 
 ```
 🚀 Figma WebSocket Server started on ws://localhost:3055
@@ -235,24 +235,24 @@ Channel my-project created successfully
 WebSocket server and connector connector_xxx initialized successfully
 ```
 
-### Figma 플러그인 로그
+### Figma Plugin Logs
 
-Figma 플러그인 개발자 도구에서 WebSocket 연결 상태를 확인할 수 있습니다.
+Check WebSocket connection status in Figma plugin developer tools.
 
-## 고급 설정
+## Advanced Configuration
 
-### 인증 설정
+### Authentication Settings
 
-FigmaConnector 노드에서 다음 인증 옵션을 설정할 수 있습니다:
+Configure the following authentication options in the FigmaConnector node:
 
-- **None**: 인증 없음
-- **Basic Auth**: 기본 인증
-- **Header Auth**: 헤더 기반 인증 (x-api-key)
+- **None**: No authentication
+- **Basic Auth**: Basic authentication
+- **Header Auth**: Header-based authentication (x-api-key)
 
-### 이벤트 타입 필터링
+### Event Type Filtering
 
-수신할 이벤트 유형을 선택할 수 있습니다:
+Select which event types to receive:
 
-- **Webhook Commands**: 웹훅을 통해 전송된 명령
-- **Figma Events**: Figma 플러그인에서 발생한 이벤트
-- **Connection Events**: 연결/해제 이벤트 
+- **Webhook Commands**: Commands sent via webhook
+- **Figma Events**: Events from Figma plugin
+- **Connection Events**: Connection/disconnection events 
