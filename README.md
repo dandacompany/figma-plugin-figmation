@@ -109,4 +109,4 @@ MIT License
 
 ## 관련 프로젝트
 
-- [n8n-nodes-figmation](https://github.com/your-username/n8n-nodes-figmation): n8n 커스텀 노드 패키지
+- [n8n-nodes-figmation](https://github.com/dandacompany/n8n-nodes-figmation): n8n 커스텀 노드 패키지
