@@ -1,7 +1,7 @@
 {
 	"private": true,
 	"type": "module",
-	"license": "CC-BY-NC-4.0",
+	"license": "MIT",
 	"scripts": {
 		"dev": "plugma dev",
 		"build": "plugma build",
