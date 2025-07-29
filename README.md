@@ -1,112 +1,112 @@
 # Figmation - Figma Plugin
 
-Figma 디자인 워크플로우의 외부 자동화를 위한 React 기반 Figma 플러그인입니다. WebSocket 서버를 통해 n8n 워크플로우와 연결되어 Figma API 명령을 실행합니다.
+A React-based Figma plugin for external automation of Figma design workflows. Connects to n8n workflows via WebSocket server to execute Figma API commands.
 
-## 주요 기능
+## Key Features
 
-- **36개 Figma API 명령 지원**: create_rectangle, create_text, move_node 등
-- **WebSocket 통신**: n8n 워크플로우와 실시간 연결
-- **채널 기반 격리**: 프로젝트별 멀티 채널 지원
-- **자동 재연결**: 연결 실패 시 지수적 백오프로 자동 복구
-- **실시간 모니터링**: 연결 상태, 채널 정보, 명령 실행 이력 표시
+- **36 Figma API Commands Support**: create_rectangle, create_text, move_node, and more
+- **WebSocket Communication**: Real-time connection with n8n workflows
+- **Channel-based Isolation**: Multi-channel support for project separation
+- **Auto-reconnection**: Automatic recovery with exponential backoff on connection failure
+- **Real-time Monitoring**: Display connection status, channel information, and command execution history
 
-## 설치 및 사용법
+## Installation and Usage
 
-### 개발 환경 설정
+### Development Environment Setup
 
 ```bash
-# 의존성 설치
+# Install dependencies
 npm install
 
-# 개발 모드 (핫 리로드)
+# Development mode (hot reload)
 npm run dev
 
-# 프로덕션 빌드
+# Production build
 npm run build
 
-# 브라우저에서 UI 테스트
+# Test UI in browser
 npm run preview
 ```
 
-### Figma에 플러그인 설치
+### Install Plugin in Figma
 
-1. `npm run build` 실행
-2. Figma에서 플러그인 → 개발 → manifest에서 플러그인 가져오기
-3. `dist/manifest.json` 파일 선택
+1. Run `npm run build`
+2. In Figma, go to Plugins → Development → Import plugin from manifest...
+3. Select the `dist/manifest.json` file
 
-## 아키텍처
+## Architecture
 
-### WebSocket 통신 흐름
+### WebSocket Communication Flow
 
 ```
-n8n 워크플로우 → WebSocket 서버 → Figma 플러그인 → Figma API
+n8n Workflow → WebSocket Server → Figma Plugin → Figma API
 ```
 
-### 지원 명령
+### Supported Commands
 
-#### 생성 명령
-- `create_rectangle`: 사각형 생성
-- `create_frame`: 프레임 생성
-- `create_text`: 텍스트 생성
-- `create_circle`: 원형 생성
-- `create_line`: 선 생성
+#### Creation Commands
+- `create_rectangle`: Create rectangle
+- `create_frame`: Create frame
+- `create_text`: Create text
+- `create_circle`: Create circle
+- `create_line`: Create line
 
-#### 조작 명령
-- `move_node`: 노드 이동
-- `resize_node`: 노드 크기 조정
-- `set_fill_color`: 채우기 색상 설정
-- `set_stroke_color`: 테두리 색상 설정
-- `set_text_content`: 텍스트 내용 변경
+#### Manipulation Commands
+- `move_node`: Move node
+- `resize_node`: Resize node
+- `set_fill_color`: Set fill color
+- `set_stroke_color`: Set stroke color
+- `set_text_content`: Change text content
 
-#### 정보 명령
-- `get_document_info`: 문서 정보 조회
-- `get_selection`: 선택된 요소 정보
-- `get_node_info`: 특정 노드 정보
+#### Information Commands
+- `get_document_info`: Get document information
+- `get_selection`: Get selected elements information
+- `get_node_info`: Get specific node information
 
-#### 관리 명령
-- `delete_node`: 노드 삭제
-- `clone_node`: 노드 복제
-- `export_node_as_image`: 노드를 이미지로 내보내기
+#### Management Commands
+- `delete_node`: Delete node
+- `clone_node`: Clone node
+- `export_node_as_image`: Export node as image
 
-## 채널 시스템
+## Channel System
 
-각 워크플로우는 고유한 채널을 통해 격리된 통신을 제공합니다:
+Each workflow provides isolated communication through unique channels:
 
-1. **채널 생성**: n8n 트리거 노드가 이름이 있는 채널 생성
-2. **클라이언트 등록**: 플러그인이 특정 채널에 연결
-3. **명령 라우팅**: 액션이 채널 ID로 특정 채널 지정
-4. **격리**: 각 채널은 별도의 클라이언트 목록 유지
+1. **Channel Creation**: n8n trigger node creates a named channel
+2. **Client Registration**: Plugin connects to a specific channel
+3. **Command Routing**: Action specifies channel ID for specific channel
+4. **Isolation**: Each channel maintains separate client lists
 
-## 개발 가이드
+## Development Guide
 
-### 새로운 명령 추가
+### Adding New Commands
 
-1. `src/main.ts`에 명령 핸들러 추가:
+1. Add command handler in `src/main.ts`:
 ```typescript
 case 'new_command':
   return await newCommandFunction(params)
 ```
 
-2. n8n 액션 노드에 명령 등록 (별도 레포지토리)
+2. Register command in n8n action node (separate repository)
 
-### 에러 처리
+### Error Handling
 
-- **연결 실패**: 지수적 백오프를 이용한 자동 재연결
-- **명령 타임아웃**: 10초 타임아웃 및 정리
-- **채널 에러**: 채널 존재 및 권한 검증
-- **Figma API 에러**: 디자인 모드 검증 및 파라미터 체크
+- **Connection Failure**: Automatic reconnection with exponential backoff
+- **Command Timeout**: 10-second timeout and cleanup
+- **Channel Error**: Channel existence and permission validation
+- **Figma API Error**: Design mode validation and parameter checking
 
-## 기술 스택
+## Tech Stack
 
-- **빌드 도구**: Vite + Plugma 프레임워크
-- **UI 프레임워크**: React 18 + TypeScript
-- **WebSocket**: 네이티브 WebSocket API
-- **Figma API**: 공식 플러그인 API 타입
+- **Build Tool**: Vite + Plugma Framework
+- **UI Framework**: React 18 + TypeScript
+- **WebSocket**: Native WebSocket API
+- **Figma API**: Official Plugin API types
 
-## 라이선스
+## License
 
 MIT License
 
-## 관련 프로젝트
+## Related Projects
 
-- [n8n-nodes-figmation](https://github.com/dandacompany/n8n-nodes-figmation): n8n 커스텀 노드 패키지
+- [n8n-nodes-figmation](https://github.com/dandacompany/n8n-nodes-figmation): n8n custom nodes package
