@@ -2,19 +2,21 @@ import React, { useState, useEffect, useRef } from 'react'
 import Icon from './components/Icon'
 import Input from './components/Input'
 import Button from './components/Button'
+import Tooltip from './components/Tooltip'
 import './App.css' // Import CSS for styles
 
 const App: React.FC = () => {
 	const [serverPort, setServerPort] = useState<number>(3055)
 	const [serverHost, setServerHost] = useState<string>('localhost')
+	const [channelId, setChannelId] = useState<string>('')
 	const [isConnected, setIsConnected] = useState<boolean>(false)
 	const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected')
 	const [selectionInfo, setSelectionInfo] = useState<any[]>([])
 	const [commandHistory, setCommandHistory] = useState<any[]>([])
 	const [activeTab, setActiveTab] = useState<string>('connection')
-	const [channelId, setChannelId] = useState<string>('')
 	const [channelList, setChannelList] = useState<any[]>([])
 	const [currentChannel, setCurrentChannel] = useState<any>(null)
+	const [isSetupInstructionsExpanded, setIsSetupInstructionsExpanded] = useState<boolean>(false)
 	
 	// WebSocket reference
 	const wsRef = useRef<WebSocket | null>(null)
@@ -40,6 +42,9 @@ const App: React.FC = () => {
 					}
 					if (message.settings.serverHost) {
 						setServerHost(message.settings.serverHost)
+					}
+					if (message.settings.channelId) {
+						setChannelId(message.settings.channelId)
 					}
 					break
 				
@@ -433,7 +438,8 @@ const App: React.FC = () => {
 				pluginMessage: {
 					type: 'update-settings',
 					serverPort,
-					serverHost
+					serverHost,
+					channelId
 				}
 			},
 			'*'
@@ -455,7 +461,7 @@ const App: React.FC = () => {
 				aria-label="Plugin navigation tabs"
 				style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '16px' }}
 			>
-				{['connection', 'channels', 'selection', 'commands'].map((tab, index) => (
+				{['connection', 'channels', 'selection'].map((tab, index) => (
 					<button
 						key={tab}
 						role="tab"
@@ -468,7 +474,7 @@ const App: React.FC = () => {
 							// Keyboard navigation for tabs
 							if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
 								e.preventDefault()
-								const tabs = ['connection', 'channels', 'selection', 'commands']
+								const tabs = ['connection', 'channels', 'selection']
 								const currentIndex = tabs.indexOf(activeTab)
 								let newIndex: number
 								
@@ -521,6 +527,131 @@ const App: React.FC = () => {
 					aria-labelledby="tab-connection"
 					tabIndex={0}
 				>
+					{/* Server Configuration Form */}
+					<form onSubmit={(e) => { e.preventDefault(); updateSettings(); }}>
+						<fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
+							<legend style={{ 
+								fontSize: '16px', 
+								fontWeight: 'bold', 
+								marginBottom: '12px',
+								padding: 0 
+							}}>
+								Server Configuration
+							</legend>
+
+							<div className="field">
+								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+									<label htmlFor="server-host" style={{ 
+										display: 'flex', 
+										alignItems: 'center', 
+										gap: '4px',
+										width: '80px',
+										flexShrink: 0,
+										paddingLeft: '8px',
+										paddingRight: '8px'
+									}}>
+										Host:
+										<Tooltip text="Usually 'localhost' for local development" />
+									</label>
+									<Input
+										id="server-host"
+										type="text"
+										value={serverHost}
+										onChange={(value: string) => {
+											try {
+												setServerHost(value);
+											} catch (error) {
+												console.error('Host input error:', error);
+												setServerHost('localhost');
+											}
+										}}
+										aria-describedby="server-host-help"
+										aria-required="true"
+										style={{ flex: 1 }}
+									/>
+								</div>
+							</div>
+
+							<div className="field">
+								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+									<label htmlFor="server-port" style={{ 
+										display: 'flex', 
+										alignItems: 'center', 
+										gap: '4px',
+										width: '80px',
+										flexShrink: 0,
+										paddingLeft: '8px',
+										paddingRight: '8px'
+									}}>
+										Port:
+										<Tooltip text="Port number between 1 and 65535 (default: 3055)" />
+									</label>
+									<Input
+										id="server-port"
+										type="number"
+										value={serverPort.toString()}
+										onChange={(value: string) => {
+											try {
+												if (value === '') {
+													setServerPort(3055);
+												} else {
+													const numValue = Number(value);
+													if (!isNaN(numValue) && numValue > 0 && numValue <= 65535) {
+														setServerPort(numValue);
+													}
+												}
+											} catch (error) {
+												console.error('Port input error:', error);
+												setServerPort(3055);
+											}
+										}}
+										aria-describedby="server-port-help"
+										aria-required="true"
+										min="1"
+										max="65535"
+										style={{ flex: 1 }}
+									/>
+								</div>
+							</div>
+
+							{/* Channel Configuration - moved up */}
+							<div className="field">
+								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+									<label htmlFor="channel-id" style={{ 
+										display: 'flex', 
+										alignItems: 'center', 
+										gap: '4px',
+										width: '80px',
+										flexShrink: 0,
+										paddingLeft: '8px',
+										paddingRight: '8px'
+									}}>
+										Channel:
+										<Tooltip text="Unique identifier for your design project channel" />
+									</label>
+									<Input
+										id="channel-id"
+										type="text"
+										value={channelId}
+										onChange={(value: string) => {
+											try {
+												setChannelId(value);
+											} catch (error) {
+												console.error('Channel ID input error:', error);
+												setChannelId('');
+											}
+										}}
+										placeholder="Enter channel ID"
+										aria-describedby="channel-id-help"
+										aria-required="false"
+										style={{ flex: 1 }}
+									/>
+								</div>
+							</div>
+							
+						</fieldset>
+					</form>
+
 					{/* Connection Status with proper ARIA live region */}
 					<div className="field" role="status" aria-live="polite" aria-atomic="true">
 						<strong id="connection-status-label">Connection Status: </strong>
@@ -535,152 +666,15 @@ const App: React.FC = () => {
 						</span>
 					</div>
 
-					{/* Server Configuration Form */}
-					<form onSubmit={(e) => { e.preventDefault(); updateSettings(); }}>
-						<fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-							<legend style={{ 
-								fontSize: '16px', 
-								fontWeight: 'bold', 
-								marginBottom: '12px',
-								padding: 0 
-							}}>
-								Server Configuration
-							</legend>
-
-							<div className="field">
-								<label htmlFor="server-host" style={{ display: 'block', marginBottom: '4px' }}>
-									Server Host:
-								</label>
-								<Input
-									id="server-host"
-									type="text"
-									value={serverHost}
-									onChange={(value: string) => {
-										try {
-											setServerHost(value);
-										} catch (error) {
-											console.error('Host input error:', error);
-											setServerHost('localhost');
-										}
-									}}
-									aria-describedby="server-host-help"
-									aria-required="true"
-								/>
-								<div id="server-host-help" style={{ 
-									fontSize: '12px', 
-									color: '#666', 
-									marginTop: '2px' 
-								}}>
-									Usually 'localhost' for local development
-								</div>
-							</div>
-
-							<div className="field">
-								<label htmlFor="server-port" style={{ display: 'block', marginBottom: '4px' }}>
-									Server Port:
-								</label>
-								<Input
-									id="server-port"
-									type="number"
-									value={serverPort.toString()}
-									onChange={(value: string) => {
-										try {
-											if (value === '') {
-												setServerPort(3055);
-											} else {
-												const numValue = Number(value);
-												if (!isNaN(numValue) && numValue > 0 && numValue <= 65535) {
-													setServerPort(numValue);
-												}
-											}
-										} catch (error) {
-											console.error('Port input error:', error);
-											setServerPort(3055);
-										}
-									}}
-									aria-describedby="server-port-help"
-									aria-required="true"
-									min="1"
-									max="65535"
-								/>
-								<div id="server-port-help" style={{ 
-									fontSize: '12px', 
-									color: '#666', 
-									marginTop: '2px' 
-								}}>
-									Port number between 1 and 65535 (default: 3055)
-								</div>
-							</div>
-							
-							<div className="field">
-								<Button 
-									onClick={updateSettings}
-									aria-describedby="save-settings-help"
-									type="submit"
-								>
-									Save Settings
-								</Button>
-								<div id="save-settings-help" style={{ 
-									fontSize: '12px', 
-									color: '#666', 
-									marginTop: '2px' 
-								}}>
-									Save server configuration to local storage
-								</div>
-							</div>
-						</fieldset>
-					</form>
-
-					{/* Channel Configuration */}
-					<div className="field" style={{ marginTop: '16px' }}>
-						<label htmlFor="channel-id" style={{ display: 'block', marginBottom: '4px' }}>
-							Channel ID:
-						</label>
-						<Input
-							id="channel-id"
-							type="text"
-							value={channelId}
-							onChange={(value: string) => {
-								try {
-									setChannelId(value);
-								} catch (error) {
-									console.error('Channel ID input error:', error);
-									setChannelId('');
-								}
-							}}
-							placeholder="Enter channel ID (e.g., my_design_project)"
-							aria-describedby="channel-id-help"
-							aria-required="false"
-						/>
-						<div id="channel-id-help" style={{ 
-							fontSize: '12px', 
-							color: '#666', 
-							marginTop: '2px' 
-						}}>
-							Unique identifier for your design project channel
-						</div>
-					</div>
-
-					{/* Connection Information */}
-					<div className="field" style={{ marginTop: '16px' }}>
-						<strong>WebSocket URL: </strong>
-						<code 
-							style={{ 
-								fontFamily: 'monospace', 
-								fontSize: '12px', 
-								color: '#666',
-								background: '#f5f5f5',
-								padding: '2px 4px',
-								borderRadius: '2px'
-							}}
-							aria-label={`WebSocket URL: ${serverUrl}`}
-						>
-							{serverUrl}
-						</code>
-					</div>
-
 					{/* Connection Actions */}
-					<div className="field" style={{ marginTop: '16px' }}>
+					<div style={{ marginTop: '4px', display: 'flex', gap: '8px' }}>
+						<Button 
+							onClick={updateSettings}
+							aria-describedby="save-settings-help"
+							type="submit"
+						>
+							Save
+						</Button>
 						{!isConnected ? (
 							<Button 
 								onClick={connectToWebSocket}
@@ -691,7 +685,7 @@ const App: React.FC = () => {
 									cursor: 'pointer'
 								}}
 							>
-								Connect to Server
+								Connect
 							</Button>
 						) : (
 							<Button 
@@ -701,19 +695,6 @@ const App: React.FC = () => {
 								Disconnect
 							</Button>
 						)}
-						<div 
-							id={isConnected ? "disconnect-button-help" : "connect-button-help"}
-							style={{ 
-								fontSize: '12px', 
-								color: '#666', 
-								marginTop: '2px' 
-							}}
-						>
-							{isConnected 
-								? 'Disconnect from the current WebSocket server'
-								: 'Connect to the WebSocket server using the configuration above'
-							}
-						</div>
 					</div>
 
 					{/* Setup Instructions with proper semantics */}
@@ -721,39 +702,61 @@ const App: React.FC = () => {
 						style={{ fontSize: '12px', marginTop: '16px' }}
 						aria-labelledby="setup-instructions-heading"
 					>
-						<h3 
+						<button 
 							id="setup-instructions-heading"
+							onClick={() => setIsSetupInstructionsExpanded(!isSetupInstructionsExpanded)}
 							style={{ 
 								fontSize: '14px', 
 								fontWeight: 'bold', 
-								margin: '0 0 8px 0' 
+								margin: '0 0 8px 0',
+								background: 'none',
+								border: 'none',
+								cursor: 'pointer',
+								display: 'flex',
+								alignItems: 'center',
+								gap: '6px',
+								padding: '0',
+								color: 'inherit'
 							}}
+							aria-expanded={isSetupInstructionsExpanded}
 						>
+							<span style={{ 
+								transform: isSetupInstructionsExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+								transition: 'transform 0.2s ease'
+							}}>
+								▶
+							</span>
 							Setup Instructions:
-						</h3>
-						<ol style={{ paddingLeft: '20px', lineHeight: '1.4' }}>
-							<li>Install <strong>n8n-nodes-figmation</strong> from n8n Community Nodes</li>
-							<li>Create n8n workflow with <strong>Figmation Connector</strong> node</li>
-							<li>Set <strong>Channel Name</strong> in connector node (e.g., "design-automation")</li>
-							<li><strong>Execute</strong> the connector node to start WebSocket server</li>
-							<li>Enter the same name as <strong>Channel ID</strong> in this plugin</li>
-							<li>Click <strong>"Connect to Server"</strong> to join the channel</li>
-							<li>Use <strong>Figmation Commander</strong> node to send 45+ Figma commands</li>
-						</ol>
-						<div 
-							style={{ 
-								marginTop: '8px', 
-								padding: '8px', 
-								background: '#f0f8ff', 
-								borderRadius: '4px',
-								border: '1px solid #cce7ff'
-							}}
-							role="note"
-							aria-label="Important note about server configuration"
-						>
-							<strong>Note:</strong> Both nodes now use unified Server ID = Channel ID system. 
-							WebSocket server runs at the configured host:port above.
-						</div>
+						</button>
+						{isSetupInstructionsExpanded && (
+							<div>
+								<ol style={{ paddingLeft: '20px', lineHeight: '1.4' }}>
+									<li>Install <strong>n8n-nodes-figmation</strong> from n8n Community Nodes</li>
+									<li>Create n8n workflow with <strong>Figmation Connector</strong> node</li>
+									<li>Set <strong>Channel Name</strong> in connector node (e.g., "design-automation")</li>
+									<li><strong>Execute</strong> the connector node to start WebSocket server</li>
+									<li>Enter the same name as <strong>Channel ID</strong> in this plugin</li>
+									<li>Click <strong>"Connect to Server"</strong> to join the channel</li>
+									<li>Use <strong>Figmation Commander</strong> node to send 45+ Figma commands</li>
+								</ol>
+								<div 
+									style={{ 
+										marginTop: '8px', 
+										marginBottom: '16px',
+										padding: '8px', 
+										background: '#f0f8ff', 
+										borderRadius: '4px',
+										border: '1px solid #cce7ff'
+									}}
+									role="note"
+									aria-label="Important note about server configuration"
+								>
+									<strong>Note:</strong> Both nodes now use unified Server ID = Channel ID system. 
+									WebSocket server runs at the configured host:port above.
+									
+								</div>
+							</div>
+						)}
 					</section>
 				</section>
 			)}

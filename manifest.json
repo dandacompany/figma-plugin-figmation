@@ -1,12 +1,13 @@
 {
   "api": "1.0.0",
-  "id": "figmation-plugin",
+  "id": "1532304249558600110",
   "name": "Figmation - Figma Design Automation",
   "main": "src/main.ts",
   "ui": "src/ui.tsx",
+  "documentAccess": "dynamic-page",
   "menu": [
     {
-      "name": "Design Automation",
+      "name": "Figmation Design Automation",
       "command": "figmation"
     }
   ],

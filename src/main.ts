@@ -3,11 +3,12 @@
 const state = {
 	serverPort: 3055, // Default port
 	serverHost: 'localhost', // Default host
+	channelId: '', // Default channel ID
 	isConnected: false
 }
 
 export default function () {
-	figma.showUI(__html__, { width: 400, height: 600, themeColors: true })
+	figma.showUI(__html__, { width: 300, height: 450, themeColors: true })
 
 	// Load settings when plugin starts
 	initializePlugin()
@@ -144,10 +145,14 @@ function updateSettings(settings) {
 	if (settings.serverHost) {
 		state.serverHost = settings.serverHost
 	}
+	if (settings.channelId !== undefined) {
+		state.channelId = settings.channelId
+	}
 
 	figma.clientStorage.setAsync('settings', {
 		serverPort: state.serverPort,
 		serverHost: state.serverHost,
+		channelId: state.channelId,
 	})
 }
 
@@ -162,6 +167,9 @@ async function initializePlugin() {
 			if (savedSettings.serverHost) {
 				state.serverHost = savedSettings.serverHost
 			}
+			if (savedSettings.channelId !== undefined) {
+				state.channelId = savedSettings.channelId
+			}
 		}
 
 		// Send initial settings to UI
@@ -170,6 +178,7 @@ async function initializePlugin() {
 			settings: {
 				serverPort: state.serverPort,
 				serverHost: state.serverHost,
+				channelId: state.channelId,
 			},
 		})
 	} catch (error) {
@@ -1606,14 +1615,14 @@ async function setTextContent(params) {
 
 async function getStyles() {
 	return {
-		paintStyles: figma.getLocalPaintStyles().map(style => ({
+		paintStyles: (await figma.getLocalPaintStylesAsync()).map(style => ({
 			nodeId: style.id,
 			id: style.id,
 			name: style.name,
 			type: style.type,
 			paints: style.paints
 		})),
-		textStyles: figma.getLocalTextStyles().map(style => ({
+		textStyles: (await figma.getLocalTextStylesAsync()).map(style => ({
 			nodeId: style.id,
 			id: style.id,
 			name: style.name,
@@ -1621,7 +1630,7 @@ async function getStyles() {
 			fontSize: style.fontSize,
 			fontName: style.fontName
 		})),
-		effectStyles: figma.getLocalEffectStyles().map(style => ({
+		effectStyles: (await figma.getLocalEffectStylesAsync()).map(style => ({
 			nodeId: style.id,
 			id: style.id,
 			name: style.name,
@@ -1633,7 +1642,7 @@ async function getStyles() {
 
 async function getLocalComponents() {
 	return {
-		components: figma.getLocalComponents().map(component => ({
+		components: (await figma.getLocalComponentsAsync()).map(component => ({
 			nodeId: component.id,
 			id: component.id,
 			name: component.name,
@@ -1655,7 +1664,8 @@ async function createComponentInstance(params) {
 		throw new Error('Node creation is only available in Design mode')
 	}
 
-	const component = figma.getLocalComponents().find(comp => comp.key === componentKey)
+	const components = await figma.getLocalComponentsAsync()
+	const component = components.find(comp => comp.key === componentKey)
 	if (!component) {
 		throw new Error(`Component not found with key: ${componentKey}`)
 	}
