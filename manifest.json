@@ -6,7 +6,7 @@
   "ui": "src/ui.tsx",
   "menu": [
     {
-      "name": "Figmation Design Automation",
+      "name": "Design Automation",
       "command": "figmation"
     }
   ],

@@ -38,7 +38,7 @@
 			"ui": "src/ui.tsx",
 			"menu": [
 				{
-					"name": "Figmation",
+					"name": "Design Automation",
 					"command": "figmation"
 				}
 			],
