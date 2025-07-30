@@ -6,4 +6,38 @@
 	line-height: 22px;
 	text-decoration: none;
 	color: var(--figma-color-text);
+	background: var(--figma-color-bg);
+	cursor: pointer;
+	transition: all 0.2s ease;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.Button:hover {
+	background: var(--figma-color-bg-hover);
+	border-color: var(--figma-color-border-strong);
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.Button:active {
+	background: var(--figma-color-bg-pressed);
+	transform: translateY(0);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.Button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	background: var(--figma-color-bg-disabled);
+	color: var(--figma-color-text-disabled);
+	transform: none;
+	box-shadow: none;
+}
+
+.Button:disabled:hover {
+	background: var(--figma-color-bg-disabled);
+	border-color: var(--figma-color-border);
+	transform: none;
+	box-shadow: none;
 }

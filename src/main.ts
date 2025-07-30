@@ -1,14 +1,13 @@
 // Figma plugin that communicates with WebSocket server
 
-const state = {
-	serverPort: 3055, // Default port
-	serverHost: 'localhost', // Default host
-	channelId: '', // Default channel ID
-	isConnected: false
-}
+	const state = {
+		serverPort: 3055, // Default port
+		channelId: 'hellofigma', // Default channel ID
+		isConnected: false
+	}
 
 export default function () {
-	figma.showUI(__html__, { width: 300, height: 450, themeColors: true })
+	figma.showUI(__html__, { width: 300, height: 380, themeColors: true })
 
 	// Load settings when plugin starts
 	initializePlugin()
@@ -138,23 +137,27 @@ export default function () {
 }
 
 // Update settings
-function updateSettings(settings) {
-	if (settings.serverPort) {
-		state.serverPort = settings.serverPort
-	}
-	if (settings.serverHost) {
-		state.serverHost = settings.serverHost
-	}
-	if (settings.channelId !== undefined) {
-		state.channelId = settings.channelId
-	}
+	function updateSettings(settings) {
+		console.log('💾 Plugin: Updating settings...', settings)
 
-	figma.clientStorage.setAsync('settings', {
-		serverPort: state.serverPort,
-		serverHost: state.serverHost,
-		channelId: state.channelId,
-	})
-}
+		if (settings.serverPort) {
+			state.serverPort = settings.serverPort
+		}
+		if (settings.channelId !== undefined) {
+			state.channelId = settings.channelId
+		}
+
+		figma.clientStorage.setAsync('settings', {
+			serverPort: state.serverPort,
+			channelId: state.channelId,
+		}).then(() => {
+			console.log('✅ Settings saved successfully')
+			figma.notify('Settings saved successfully!', { timeout: 2000 })
+		}).catch((error) => {
+			console.error('❌ Failed to save settings:', error)
+			figma.notify('Failed to save settings', { error: true, timeout: 3000 })
+		})
+	}
 
 // Initialize plugin
 async function initializePlugin() {

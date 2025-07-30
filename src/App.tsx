@@ -7,8 +7,7 @@ import './App.css' // Import CSS for styles
 
 const App: React.FC = () => {
 	const [serverPort, setServerPort] = useState<number>(3055)
-	const [serverHost, setServerHost] = useState<string>('localhost')
-	const [channelId, setChannelId] = useState<string>('')
+	const [channelId, setChannelId] = useState<string>('hellofigma')
 	const [isConnected, setIsConnected] = useState<boolean>(false)
 	const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected')
 	const [selectionInfo, setSelectionInfo] = useState<any[]>([])
@@ -25,8 +24,15 @@ const App: React.FC = () => {
 	const pingInterval = useRef<NodeJS.Timeout | null>(null)
 	const lastPongTime = useRef<number>(Date.now())
 
-	// Server URL calculation (auto-updates when serverHost, serverPort changes)
-	const serverUrl = `ws://${serverHost}:${serverPort}`
+		// Server URL calculation - simplified for localhost only (no path)
+	const serverUrl = `ws://localhost:${serverPort}`
+	
+	// Debug logging
+	console.log('🔍 URL Debug Info:', {
+		serverPort,
+		channelId,
+		finalUrl: serverUrl
+	})
 
 	// Handle messages from the plugin
 	useEffect(() => {
@@ -110,7 +116,12 @@ const App: React.FC = () => {
 		setConnectionStatus('Connecting...')
 		
 		try {
-			console.log('Attempting to connect to:', serverUrl)
+					console.log('🔌 Attempting to connect to:', serverUrl)
+		console.log('🔍 Connection details:', {
+			url: serverUrl,
+			port: serverPort,
+			channel: channelId
+		})
 			const ws = new WebSocket(serverUrl)
 			
 			ws.onopen = () => {
@@ -432,18 +443,39 @@ const App: React.FC = () => {
 	}
 
 	// 설정 업데이트
-	const updateSettings = () => {
+		const updateSettings = () => {
+		console.log('💾 Saving settings...', {
+			serverPort,
+			channelId
+		})
+
 		window.parent.postMessage(
 			{
 				pluginMessage: {
 					type: 'update-settings',
 					serverPort,
-					serverHost,
 					channelId
 				}
 			},
 			'*'
 		)
+		
+		// Show visual feedback
+		const saveButton = document.querySelector('button[type="submit"]') as HTMLButtonElement
+		if (saveButton) {
+			const originalText = saveButton.textContent
+			saveButton.textContent = 'Saved!'
+			saveButton.style.background = '#4CAF50'
+			saveButton.style.color = 'white'
+			saveButton.disabled = true
+			
+			setTimeout(() => {
+				saveButton.textContent = originalText
+				saveButton.style.background = ''
+				saveButton.style.color = ''
+				saveButton.disabled = false
+			}, 1500)
+		}
 	}
 
 
@@ -538,39 +570,6 @@ const App: React.FC = () => {
 							}}>
 								Server Configuration
 							</legend>
-
-							<div className="field">
-								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-									<label htmlFor="server-host" style={{ 
-										display: 'flex', 
-										alignItems: 'center', 
-										gap: '4px',
-										width: '80px',
-										flexShrink: 0,
-										paddingLeft: '8px',
-										paddingRight: '8px'
-									}}>
-										Host:
-										<Tooltip text="Server host (localhost for local, IP/domain for remote)" />
-									</label>
-									<Input
-										id="server-host"
-										type="text"
-										value={serverHost}
-										onChange={(value: string) => {
-											try {
-												setServerHost(value);
-											} catch (error) {
-												console.error('Host input error:', error);
-												setServerHost('localhost');
-											}
-										}}
-										aria-describedby="server-host-help"
-										aria-required="true"
-										style={{ flex: 1 }}
-									/>
-								</div>
-							</div>
 
 							<div className="field">
 								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -733,7 +732,12 @@ const App: React.FC = () => {
 								<ol style={{ paddingLeft: '20px', lineHeight: '1.4' }}>
 									<li>Install <strong>n8n-nodes-figmation</strong> from n8n Community Nodes</li>
 									<li>Create n8n workflow with <strong>Figmation Connector</strong> node</li>
-									<li>Set <strong>WebSocket Host</strong> to <code>0.0.0.0</code> for external access or <code>localhost</code> for local only</li>
+									<li>Choose <strong>Connection Type</strong>:
+										<ul style={{ marginTop: '8px', marginBottom: '8px' }}>
+											<li><strong>Standalone</strong>: Set <code>WebSocket Host</code> to <code>0.0.0.0</code> for external access</li>
+											<li><strong>Integrated</strong>: Use n8n HTTP server with WebSocket path (e.g., <code>/ws</code>)</li>
+										</ul>
+									</li>
 									<li>Set <strong>Channel Name</strong> in connector node (e.g., "design-automation")</li>
 									<li><strong>Execute</strong> the connector node to start WebSocket server</li>
 									<li>Enter the same name as <strong>Channel ID</strong> in this plugin</li>
