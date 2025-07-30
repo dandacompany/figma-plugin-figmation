@@ -1092,8 +1092,26 @@ async function createText(params) {
 		// Text-specific properties
 		if (textCase !== undefined) textNode.textCase = textCase
 		if (textDecoration !== undefined) textNode.textDecoration = textDecoration
-		if (letterSpacing !== undefined) textNode.letterSpacing = letterSpacing
-		if (lineHeight !== undefined) textNode.lineHeight = lineHeight
+		if (letterSpacing !== undefined) {
+			// letterSpacing should be an object with 'value' and 'unit' properties
+			if (typeof letterSpacing === 'number') {
+				textNode.letterSpacing = { value: letterSpacing, unit: 'PIXELS' }
+			} else if (typeof letterSpacing === 'object' && letterSpacing.value !== undefined) {
+				textNode.letterSpacing = letterSpacing
+			} else {
+				console.warn('Invalid letterSpacing format, skipping...')
+			}
+		}
+		if (lineHeight !== undefined) {
+			// lineHeight should be an object with 'value' and 'unit' properties
+			if (typeof lineHeight === 'number') {
+				textNode.lineHeight = { value: lineHeight, unit: 'PIXELS' }
+			} else if (typeof lineHeight === 'object' && lineHeight.value !== undefined) {
+				textNode.lineHeight = lineHeight
+			} else {
+				console.warn('Invalid lineHeight format, skipping...')
+			}
+		}
 		if (paragraphIndent !== undefined) textNode.paragraphIndent = paragraphIndent
 		if (paragraphSpacing !== undefined) textNode.paragraphSpacing = paragraphSpacing
 		if (textAutoResize !== undefined) textNode.textAutoResize = textAutoResize

@@ -41,3 +41,8 @@ Note: This plugin requires the n8n-nodes-figmation community nodes to be install
 Developer: Dante
 Email: datapod.k@gmail.com
 YouTube: https://youtube.com/@dantelabs
+
+
+Tag Line : Automate Figma design tasks and workflows by connecting n8n and Figma through WebSocket integration.
+
+Tags : #automation #design-tools #n8n #websocket #workflow
