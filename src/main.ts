@@ -1271,11 +1271,25 @@ async function setFillColor(params) {
 	if (!params || !params.nodeId) {
 		throw new Error('Missing required parameter: nodeId')
 	}
-	if (!params.color) {
-		throw new Error('Missing required parameter: color')
-	}
 
-	const { nodeId, color } = params
+	const { nodeId } = params
+	
+	// Handle different color parameter formats
+	let color
+	if (params.color) {
+		// Standard format: { color: { r, g, b, a } }
+		color = params.color
+	} else if (params.Red_Value !== undefined || params.Green_Value !== undefined || params.Blue_Value !== undefined) {
+		// n8n format: { Red_Value, Green_Value, Blue_Value, Alpha_Value }
+		color = {
+			r: parseFloat(params.Red_Value) || 0,
+			g: parseFloat(params.Green_Value) || 0,
+			b: parseFloat(params.Blue_Value) || 0,
+			a: parseFloat(params.Alpha_Value) || 1
+		}
+	} else {
+		throw new Error('Missing required parameter: color or Red_Value/Green_Value/Blue_Value')
+	}
 
 	try {
 		const node = await figma.getNodeByIdAsync(nodeId)
