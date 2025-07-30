@@ -138,6 +138,17 @@ npm run preview
 2. In Figma, go to Plugins → Development → Import plugin from manifest...
 3. Select the `dist/manifest.json` file
 
+### Configuration
+
+The plugin is configured for **localhost-only connections** for enhanced security and stability:
+
+- **Host**: Fixed to `localhost` (cannot be changed)
+- **Port**: Configurable (default: 3055)
+- **Channel**: Configurable (default: hellofigma)
+- **Connection URL**: `ws://localhost:{port}` (no path)
+
+This simplified configuration eliminates external server access issues and ensures reliable local development.
+
 ## Architecture
 
 ### WebSocket Communication Flow
