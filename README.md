@@ -2,13 +2,117 @@
 
 A React-based Figma plugin for external automation of Figma design workflows. Connects to n8n workflows via WebSocket server to execute Figma API commands.
 
-## Key Features
+## 🎯 Core Architecture
+
+```mermaid
+graph TB
+    subgraph "External AI Agent"
+        A[AI Agent<br/>Claude/GPT/Gemini]
+    end
+    
+    subgraph "n8n Workflow"
+        B[MCP Server Trigger<br/>AI Agent 연결]
+        C[n8n Command Node<br/>Figma 명령 실행]
+    end
+    
+    subgraph "Communication Layer"
+        D[WebSocket Connector<br/>실시간 통신]
+    end
+    
+    subgraph "Figma Plugin"
+        E[Figma Plugin<br/>명령 수신 및 실행]
+    end
+    
+    subgraph "Figma Design"
+        F[Figma Canvas<br/>디자인 결과물]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    
+    style A fill:#ff6b6b
+    style B fill:#4ecdc4
+    style C fill:#45b7d1
+    style D fill:#ffd93d
+    style E fill:#96ceb4
+    style F fill:#f8f9fa
+```
+
+## 🔄 Data Flow
+
+```mermaid
+sequenceDiagram
+    participant AI as External AI Agent
+    participant MCP as MCP Server Trigger
+    participant CMD as n8n Command Node
+    participant WS as WebSocket Connector
+    participant PLG as Figma Plugin
+    participant FIG as Figma Design
+    
+    Note over AI,FIG: 1. AI Agent sends natural language command
+    AI->>MCP: "Create a blue button"
+    MCP->>CMD: Parse and convert command
+    
+    Note over AI,FIG: 2. Execute Figma command in n8n
+    CMD->>WS: Send create_rectangle command
+    WS->>PLG: Forward command via WebSocket
+    
+    Note over AI,FIG: 3. Generate design in Figma
+    PLG->>FIG: Call Figma API
+    FIG->>PLG: Return created button
+    PLG->>WS: Send execution result
+    WS->>CMD: Receive result
+    CMD->>MCP: Report completion
+    MCP->>AI: Notify design completion
+```
+
+## ⚡ Key Features
 
 - **36 Figma API Commands Support**: create_rectangle, create_text, move_node, and more
 - **WebSocket Communication**: Real-time connection with n8n workflows
 - **Channel-based Isolation**: Multi-channel support for project separation
 - **Auto-reconnection**: Automatic recovery with exponential backoff on connection failure
 - **Real-time Monitoring**: Display connection status, channel information, and command execution history
+- **Dynamic Loading Compatible**: Supports Figma's new dynamic page loading system
+
+## 🏗️ Component Architecture
+
+```mermaid
+graph LR
+    subgraph "AI Layer"
+        A1[AI Agent<br/>Natural Language Commands]
+    end
+    
+    subgraph "n8n Layer"
+        B1[MCP Server Trigger<br/>AI Agent Connection Point]
+        B2[Command Node<br/>Figma Command Processing]
+    end
+    
+    subgraph "Communication Layer"
+        C1[WebSocket Connector<br/>Real-time Bidirectional Communication]
+    end
+    
+    subgraph "Figma Layer"
+        D1[Figma Plugin<br/>Command Execution Engine]
+        D2[Figma Design<br/>Final Output]
+    end
+    
+    A1 --> B1
+    B1 --> B2
+    B2 --> C1
+    C1 --> D1
+    D1 --> D2
+    
+    style A1 fill:#ff6b6b
+    style B1 fill:#4ecdc4
+    style B2 fill:#45b7d1
+    style C1 fill:#ffd93d
+    style D1 fill:#96ceb4
+    style D2 fill:#f8f9fa
+```
 
 ## Installation and Usage
 
