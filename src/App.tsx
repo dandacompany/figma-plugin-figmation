@@ -551,7 +551,7 @@ const App: React.FC = () => {
 										paddingRight: '8px'
 									}}>
 										Host:
-										<Tooltip text="Usually 'localhost' for local development" />
+										<Tooltip text="Server host (localhost for local, IP/domain for remote)" />
 									</label>
 									<Input
 										id="server-host"
@@ -733,9 +733,11 @@ const App: React.FC = () => {
 								<ol style={{ paddingLeft: '20px', lineHeight: '1.4' }}>
 									<li>Install <strong>n8n-nodes-figmation</strong> from n8n Community Nodes</li>
 									<li>Create n8n workflow with <strong>Figmation Connector</strong> node</li>
+									<li>Set <strong>WebSocket Host</strong> to <code>0.0.0.0</code> for external access or <code>localhost</code> for local only</li>
 									<li>Set <strong>Channel Name</strong> in connector node (e.g., "design-automation")</li>
 									<li><strong>Execute</strong> the connector node to start WebSocket server</li>
 									<li>Enter the same name as <strong>Channel ID</strong> in this plugin</li>
+									<li>Set <strong>Host</strong> to your server IP/domain (not localhost for remote access)</li>
 									<li>Click <strong>"Connect to Server"</strong> to join the channel</li>
 									<li>Use <strong>Figmation Commander</strong> node to send 45+ Figma commands</li>
 								</ol>

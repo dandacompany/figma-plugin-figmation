@@ -37,6 +37,12 @@
       "ws://localhost:3058",
       "ws://localhost:3059",
       "ws://localhost:3060",
+      "ws://*.n8n.cloud",
+      "ws://*.n8n.io",
+      "ws://*.your-domain.com",
+      "wss://*.n8n.cloud",
+      "wss://*.n8n.io",
+      "wss://*.your-domain.com",
       "https://images.unsplash.com",
       "https://picsum.photos",
       "https://via.placeholder.com"
@@ -49,10 +55,16 @@
       "ws://localhost:3058",
       "ws://localhost:3059",
       "ws://localhost:3060",
+      "ws://*.n8n.cloud",
+      "ws://*.n8n.io",
+      "ws://*.your-domain.com",
+      "wss://*.n8n.cloud",
+      "wss://*.n8n.io",
+      "wss://*.your-domain.com",
       "https://images.unsplash.com",
       "https://picsum.photos",
       "https://via.placeholder.com"
     ],
-    "reasoning": "This plugin connects to local WebSocket servers (ports 3055-3060) for secure communication with n8n workflow automation systems. Image URLs are used exclusively for the create_image_from_url functionality to demonstrate design automation capabilities with placeholder images from trusted sources (Unsplash, Picsum, Placeholder.com). No personal data is transmitted or stored externally."
+    "reasoning": "This plugin connects to WebSocket servers for secure communication with n8n workflow automation systems. Supports both local development (localhost) and cloud deployments (n8n.cloud, custom domains). Image URLs are used exclusively for the create_image_from_url functionality to demonstrate design automation capabilities with placeholder images from trusted sources (Unsplash, Picsum, Placeholder.com). No personal data is transmitted or stored externally."
   }
 }
