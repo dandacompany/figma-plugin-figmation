@@ -170,7 +170,7 @@ n8n Workflow → WebSocket Server → Figma Plugin → Figma API
 - `move_node`: Move node
 - `resize_node`: Resize node
 - `set_fill_color`: Set fill color
-- `set_stroke_color`: Set stroke color
+- `set_stroke_color`: Set stroke color or remove stroke completely
 - `set_text_content`: Change text content
 
 #### Information Commands

@@ -352,6 +352,26 @@ async function handleCommand(command, params) {
 // Utility functions
 
 // Color validation and Paint object creation
+function hexToRgb(hex) {
+	// Remove # if present
+	hex = hex.replace('#', '')
+	
+	// Convert 3-digit hex to 6-digit
+	if (hex.length === 3) {
+		hex = hex.split('').map(c => c + c).join('')
+	}
+	
+	if (hex.length !== 6) {
+		throw new Error('Invalid hex color format')
+	}
+	
+	const r = parseInt(hex.substring(0, 2), 16) / 255
+	const g = parseInt(hex.substring(2, 4), 16) / 255
+	const b = parseInt(hex.substring(4, 6), 16) / 255
+	
+	return { r, g, b }
+}
+
 function createColorPaint(colorInput) {
 	if (!colorInput || typeof colorInput !== 'object') {
 		throw new Error('Color must be an object with r, g, b properties')
@@ -374,9 +394,96 @@ function createColorPaint(colorInput) {
 	}
 	
 	return {
-		type: 'SOLID',
+		type: 'SOLID' as const,
 		color: { r, g, b },
 		opacity: a,
+	}
+}
+
+function createGradientPaint(gradientParams) {
+	if (!gradientParams || typeof gradientParams !== 'object') {
+		throw new Error('Gradient parameters must be an object')
+	}
+	
+	const { type, startColor, endColor, angle = 0 } = gradientParams
+	
+	// Convert hex colors to RGB
+	let startRgb, endRgb
+	try {
+		startRgb = hexToRgb(startColor)
+		endRgb = hexToRgb(endColor)
+	} catch (error) {
+		throw new Error(`Invalid gradient color format: ${error.message}`)
+	}
+	
+	// Create gradient stops
+	const gradientStops = [
+		{
+			position: 0,
+			color: { ...startRgb, a: 1.0 },
+		},
+		{
+			position: 1,
+			color: { ...endRgb, a: 1.0 },
+		},
+	]
+	
+	// Convert angle to radians and create transform matrix
+	const angleRad = (angle * Math.PI) / 180
+	
+	let gradientTransform: Transform
+	
+	switch (type.toUpperCase()) {
+		case 'LINEAR_GRADIENT':
+			// Linear gradient transform based on angle
+			gradientTransform = [
+				[Math.cos(angleRad), Math.sin(angleRad), 0.5 - 0.5 * Math.cos(angleRad) - 0.5 * Math.sin(angleRad)],
+				[-Math.sin(angleRad), Math.cos(angleRad), 0.5 + 0.5 * Math.sin(angleRad) - 0.5 * Math.cos(angleRad)],
+			] as Transform
+			return {
+				type: 'GRADIENT_LINEAR' as const,
+				gradientTransform,
+				gradientStops,
+			}
+			
+		case 'RADIAL_GRADIENT':
+			// Radial gradient - from center outward
+			gradientTransform = [
+				[1, 0, 0],
+				[0, 1, 0],
+			]
+			return {
+				type: 'GRADIENT_RADIAL' as const,
+				gradientTransform,
+				gradientStops,
+			}
+			
+		case 'ANGULAR_GRADIENT':
+			// Angular/conical gradient
+			gradientTransform = [
+				[Math.cos(angleRad), Math.sin(angleRad), 0.5],
+				[-Math.sin(angleRad), Math.cos(angleRad), 0.5],
+			]
+			return {
+				type: 'GRADIENT_ANGULAR' as const,
+				gradientTransform,
+				gradientStops,
+			}
+			
+		case 'DIAMOND_GRADIENT':
+			// Diamond gradient
+			gradientTransform = [
+				[Math.cos(angleRad), Math.sin(angleRad), 0.5],
+				[-Math.sin(angleRad), Math.cos(angleRad), 0.5],
+			]
+			return {
+				type: 'GRADIENT_DIAMOND' as const,
+				gradientTransform,
+				gradientStops,
+			}
+			
+		default:
+			throw new Error(`Unsupported gradient type: ${type}`)
 	}
 }
 
@@ -470,6 +577,14 @@ async function getNodeInfo(nodeId) {
 		height: 'height' in node ? node.height : undefined,
 		fills: 'fills' in node ? node.fills : undefined,
 		strokes: 'strokes' in node ? node.strokes : undefined,
+		cornerRadius: 'cornerRadius' in node ? node.cornerRadius : undefined,
+		topLeftRadius: 'topLeftRadius' in node ? node.topLeftRadius : undefined,
+		topRightRadius: 'topRightRadius' in node ? node.topRightRadius : undefined,
+		bottomLeftRadius: 'bottomLeftRadius' in node ? node.bottomLeftRadius : undefined,
+		bottomRightRadius: 'bottomRightRadius' in node ? node.bottomRightRadius : undefined,
+		opacity: 'opacity' in node ? node.opacity : undefined,
+		blendMode: 'blendMode' in node ? node.blendMode : undefined,
+		rotation: 'rotation' in node ? node.rotation : undefined,
 	}
 }
 
@@ -974,6 +1089,14 @@ async function createText(params) {
 		fontSize = 14,
 		fontWeight = 400,
 		fontColor,
+		fontColorR,
+		fontColorG,
+		fontColorB,
+		fontColorA,
+		strokeColorR,
+		strokeColorG,
+		strokeColorB,
+		strokeColorA,
 		name = '',
 		parentId,
 		// All Figma API properties
@@ -1136,7 +1259,21 @@ async function createText(params) {
 				const paintStyle = createColorPaint(fontColor)
 				textNode.fills = [paintStyle]
 			} catch (colorError) {
-				throw new Error(`Invalid font color: ${colorError.message}`)
+				throw new Error(`Invalid font color: ${(colorError as Error).message}`)
+			}
+		} else if (fontColorR !== undefined || fontColorG !== undefined || fontColorB !== undefined || fontColorA !== undefined) {
+			// Handle individual color components
+			const color = {
+				r: fontColorR || 0,
+				g: fontColorG || 0,
+				b: fontColorB || 0,
+				a: fontColorA !== undefined ? fontColorA : 1
+			}
+			try {
+				const paintStyle = createColorPaint(color)
+				textNode.fills = [paintStyle]
+			} catch (colorError) {
+				throw new Error(`Invalid font color: ${(colorError as Error).message}`)
 			}
 		}
 
@@ -1148,7 +1285,21 @@ async function createText(params) {
 				const strokePaint = createColorPaint(strokeColor)
 				textNode.strokes = [strokePaint]
 			} catch (colorError) {
-				throw new Error(`Invalid stroke color: ${colorError.message}`)
+				throw new Error(`Invalid stroke color: ${(colorError as Error).message}`)
+			}
+		} else if (strokeColorR !== undefined || strokeColorG !== undefined || strokeColorB !== undefined || strokeColorA !== undefined) {
+			// Handle individual stroke color components
+			const color = {
+				r: strokeColorR || 0,
+				g: strokeColorG || 0,
+				b: strokeColorB || 0,
+				a: strokeColorA !== undefined ? strokeColorA : 1
+			}
+			try {
+				const strokePaint = createColorPaint(color)
+				textNode.strokes = [strokePaint]
+			} catch (colorError) {
+				throw new Error(`Invalid stroke color: ${(colorError as Error).message}`)
 			}
 		}
 
@@ -1271,11 +1422,33 @@ async function setFillColor(params) {
 	if (!params || !params.nodeId) {
 		throw new Error('Missing required parameter: nodeId')
 	}
-	if (!params.color) {
-		throw new Error('Missing required parameter: color')
+
+	console.log('setFillColor received params:', JSON.stringify(params, null, 2))
+
+	const { nodeId, color, gradient, Fill_Type, Start_Color, End_Color, Angle } = params
+
+	// Check if we have n8n-style parameters and convert them
+	let finalGradient = gradient
+	let finalColor = color
+	
+	if (Fill_Type && Fill_Type !== 'solid') {
+		// Convert n8n-style gradient parameters to gradient object
+		finalGradient = {
+			type: Fill_Type.toUpperCase(), // 'linear_gradient' -> 'LINEAR_GRADIENT'
+			startColor: Start_Color || '#FF0000',
+			endColor: End_Color || '#0000FF',
+			angle: Angle || 0
+		}
+		console.log('Converted n8n parameters to gradient:', JSON.stringify(finalGradient, null, 2))
+	} else if (Fill_Type === 'solid' && !color) {
+		// Handle n8n solid color
+		finalColor = params.color // Should be hex color from n8n
 	}
 
-	const { nodeId, color } = params
+	// Must have either color or gradient
+	if (!finalColor && !finalGradient) {
+		throw new Error('Missing required parameter: color or gradient')
+	}
 
 	try {
 		const node = await figma.getNodeByIdAsync(nodeId)
@@ -1287,8 +1460,25 @@ async function setFillColor(params) {
 			throw new Error(`Node type "${node.type}" does not support fill colors`)
 		}
 
-		// Color validation and application
-		const paintStyle = createColorPaint(color)
+		let paintStyle
+		let fillType
+		
+		// Choose between solid color and gradient
+		if (finalGradient) {
+			paintStyle = createGradientPaint(finalGradient)
+			fillType = 'gradient'
+		} else {
+			// Handle both hex string and RGB object
+			if (typeof finalColor === 'string') {
+				// Convert hex string to RGB object
+				const rgbColor = hexToRgb(finalColor)
+				paintStyle = createColorPaint(rgbColor)
+			} else {
+				paintStyle = createColorPaint(finalColor)
+			}
+			fillType = 'solid'
+		}
+		
 		node.fills = [paintStyle]
 
 		return {
@@ -1297,8 +1487,9 @@ async function setFillColor(params) {
 			name: node.name,
 			type: node.type,
 			fills: [paintStyle],
+			fillType: fillType,
 			success: true,
-			message: `Fill color applied to "${node.name}" successfully`
+			message: `Fill ${fillType} applied to "${node.name}" successfully`
 		}
 	} catch (error) {
 		throw new Error(`Failed to set fill color: ${error.message}`)
@@ -1310,7 +1501,16 @@ async function setStrokeColor(params) {
 		nodeId,
 		color: { r, g, b, a },
 		weight = 1,
+		removeStroke = false,
 	} = params || {}
+
+	// 새로운 파라미터명 지원 (하위 호환성)
+	const strokeColor = params.color || {
+		r: params.Stroke_Red_Value || r || 1,
+		g: params.Stroke_Green_Value || g || 0,
+		b: params.Stroke_Blue_Value || b || 0,
+		a: params.Stroke_Alpha_Value || a || 1,
+	}
 
 	if (!nodeId) {
 		throw new Error('Missing nodeId parameter')
@@ -1325,14 +1525,32 @@ async function setStrokeColor(params) {
 		throw new Error(`Node does not support strokes: ${nodeId}`)
 	}
 
+	// 외곽선 완전 제거 요청인 경우
+	if (removeStroke) {
+		node.strokes = []
+		if ('strokeWeight' in node) {
+			node.strokeWeight = 0
+		}
+		
+		return {
+			nodeId: node.id,
+			id: node.id,
+			name: node.name,
+			strokes: node.strokes,
+			strokeWeight: 'strokeWeight' in node ? node.strokeWeight : undefined,
+			removed: true,
+		}
+	}
+
+	// 기존 stroke 설정 로직
 	const paintStyle = {
 		type: 'SOLID',
 		color: {
-			r: parseFloat(r) || 0,
-			g: parseFloat(g) || 0,
-			b: parseFloat(b) || 0,
+			r: parseFloat(strokeColor.r) || 0,
+			g: parseFloat(strokeColor.g) || 0,
+			b: parseFloat(strokeColor.b) || 0,
 		},
-		opacity: parseFloat(a) || 1,
+		opacity: parseFloat(strokeColor.a) || 1,
 	}
 
 	node.strokes = [paintStyle]
@@ -1347,6 +1565,7 @@ async function setStrokeColor(params) {
 		name: node.name,
 		strokes: node.strokes,
 		strokeWeight: 'strokeWeight' in node ? node.strokeWeight : undefined,
+		removed: false,
 	}
 }
 
@@ -3066,6 +3285,141 @@ async function createEllipse(params) {
 	}
 }
 
+// SVG Path Parser Helper Functions
+function parseSvgPath(pathData) {
+	// Convert complex SVG path commands to simple M, L, Z commands
+	let processedPath = pathData
+	
+	// Process Cubic Bezier Curves (C command)
+	processedPath = processCubicBezier(processedPath)
+	
+	// Process Arc commands (A command)  
+	processedPath = processArcs(processedPath)
+	
+	// Clean up coordinates (remove extra commas and spaces)
+	processedPath = cleanupCoordinates(processedPath)
+	
+	return processedPath
+}
+
+function processCubicBezier(pathData) {
+	// Convert cubic bezier curves to line segments
+	return pathData.replace(/C\s*([\d.-]+)[,\s]+([\d.-]+)[,\s]+([\d.-]+)[,\s]+([\d.-]+)[,\s]+([\d.-]+)[,\s]+([\d.-]+)/g, 
+		(match, x1, y1, x2, y2, x3, y3, offset, string) => {
+			// Get current position from previous M or L command
+			const beforeMatch = string.substring(0, offset)
+			const lastMoveMatch = beforeMatch.match(/[ML]\s*([\d.-]+)[,\s]+([\d.-]+)(?!.*[ML])/g)
+			
+			let currentX = 0, currentY = 0
+			if (lastMoveMatch && lastMoveMatch.length > 0) {
+				const lastMove = lastMoveMatch[lastMoveMatch.length - 1]
+				const coords = lastMove.match(/([\d.-]+)/g)
+				if (coords && coords.length >= 2) {
+					currentX = parseFloat(coords[coords.length - 2])
+					currentY = parseFloat(coords[coords.length - 1])
+				}
+			}
+			
+			// Approximate bezier curve with line segments
+			const segments = approximateBezier(
+				currentX, currentY, 
+				parseFloat(x1), parseFloat(y1),
+				parseFloat(x2), parseFloat(y2),
+				parseFloat(x3), parseFloat(y3)
+			)
+			
+			return segments
+		})
+}
+
+function approximateBezier(x0, y0, x1, y1, x2, y2, x3, y3, segments = 8) {
+	// Create line segments to approximate bezier curve
+	let result = ''
+	
+	for (let i = 1; i <= segments; i++) {
+		const t = i / segments
+		const x = Math.pow(1-t, 3) * x0 + 3 * Math.pow(1-t, 2) * t * x1 + 
+				  3 * (1-t) * Math.pow(t, 2) * x2 + Math.pow(t, 3) * x3
+		const y = Math.pow(1-t, 3) * y0 + 3 * Math.pow(1-t, 2) * t * y1 + 
+				  3 * (1-t) * Math.pow(t, 2) * y2 + Math.pow(t, 3) * y3
+		
+		result += ` L ${Math.round(x * 100) / 100} ${Math.round(y * 100) / 100}`
+	}
+	
+	return result
+}
+
+function processArcs(pathData) {
+	// Convert arc commands to bezier approximation then to line segments
+	return pathData.replace(/A\s*([\d.-]+)[,\s]+([\d.-]+)[,\s]+([\d.-]+)[,\s]+([01])[,\s]+([01])[,\s]+([\d.-]+)[,\s]+([\d.-]+)/g,
+		(match, rx, ry, rotation, largeArc, sweep, x2, y2, offset, string) => {
+			// Get current position
+			const beforeMatch = string.substring(0, offset)
+			const lastMoveMatch = beforeMatch.match(/[ML]\s*([\d.-]+)[,\s]+([\d.-]+)(?!.*[ML])/g)
+			
+			let currentX = 0, currentY = 0
+			if (lastMoveMatch && lastMoveMatch.length > 0) {
+				const lastMove = lastMoveMatch[lastMoveMatch.length - 1]
+				const coords = lastMove.match(/([\d.-]+)/g)
+				if (coords && coords.length >= 2) {
+					currentX = parseFloat(coords[coords.length - 2])
+					currentY = parseFloat(coords[coords.length - 1])
+				}
+			}
+			
+			// Approximate arc with line segments
+			return approximateArc(
+				currentX, currentY,
+				parseFloat(rx), parseFloat(ry),
+				parseFloat(rotation),
+				parseInt(largeArc), parseInt(sweep),
+				parseFloat(x2), parseFloat(y2)
+			)
+		})
+}
+
+function approximateArc(x1, y1, rx, ry, rotation, largeArc, sweep, x2, y2, segments = 12) {
+	// Simplified arc approximation - create line segments
+	let result = ''
+	
+	// Calculate center and angles (simplified)
+	const dx = x2 - x1
+	const dy = y2 - y1
+	const distance = Math.sqrt(dx * dx + dy * dy)
+	
+	if (distance === 0) return ` L ${x2} ${y2}`
+	
+	// Create arc approximation with line segments
+	for (let i = 1; i <= segments; i++) {
+		const t = i / segments
+		
+		// Simple interpolation with curve effect
+		const midX = (x1 + x2) / 2
+		const midY = (y1 + y2) / 2
+		
+		// Add curve offset based on radius
+		const offsetX = -dy * (rx / distance) * Math.sin(Math.PI * t) * 0.5
+		const offsetY = dx * (ry / distance) * Math.sin(Math.PI * t) * 0.5
+		
+		const x = x1 + t * dx + offsetX
+		const y = y1 + t * dy + offsetY
+		
+		result += ` L ${Math.round(x * 100) / 100} ${Math.round(y * 100) / 100}`
+	}
+	
+	return result
+}
+
+function cleanupCoordinates(pathData) {
+	// Remove extra commas and normalize spaces
+	return pathData
+		.replace(/,\s*,/g, ',')  // Remove double commas
+		.replace(/,(\s*[a-zA-Z])/g, ' $1')  // Remove comma before command
+		.replace(/([a-zA-Z])\s*,/g, '$1 ')  // Remove comma after command
+		.replace(/\s+/g, ' ')  // Normalize spaces
+		.trim()
+}
+
 async function createVectorPath(params) {
 	const {
 		pathData,
@@ -3089,12 +3443,12 @@ async function createVectorPath(params) {
 		const vectorNode = figma.createVector()
 		vectorNode.name = name
 		
-		// Parse and set the vector path
-		// Note: This is a simplified implementation
-		// In a real-world scenario, you'd need a proper SVG path parser
+		// Parse and set the vector path using improved SVG parser
+		// Process complex SVG commands (bezier curves, arcs) into simple M, L, Z commands
+		const processedPathData = parseSvgPath(pathData)
 		const parsedPaths = [{
-			windingRule: 'NONZERO',
-			data: pathData
+			windingRule: 'NONZERO' as const,
+			data: processedPathData
 		}]
 		
 		vectorNode.vectorPaths = parsedPaths
@@ -4350,157 +4704,32 @@ async function createSvgToVector(params: any) {
 
 // 사용자 정의 JSON 명령 실행 함수
 async function executeCustomCommand(params: any) {
-	const {
-		customJson,
-		nodeType = 'FRAME',
-		x = 0,
-		y = 0,
-		name = `Custom Node ${Date.now()}`,
-		parentId = null
-	} = params || {}
-
-	// Design 모드 체크
-	if (figma.editorType !== 'figma') {
-		throw new Error('Node creation is only available in Design mode')
-	}
+	const { customJson } = params || {}
 
 	if (!customJson) {
-		throw new Error('Custom JSON is required')
+		throw new Error('Custom JSON is required');
 	}
 
 	try {
-		let customData
+		let customData;
 		if (typeof customJson === 'string') {
-			customData = JSON.parse(customJson)
+			customData = JSON.parse(customJson);
 		} else {
-			customData = customJson
+			customData = customJson;
 		}
 
-		// 노드 타입에 따라 생성
-		let node
-		const upperNodeType = (customData.type || nodeType).toUpperCase()
+		const { command, params: commandParams } = customData;
 
-		switch (upperNodeType) {
-			case 'FRAME':
-				node = figma.createFrame()
-				break
-			case 'RECTANGLE':
-				node = figma.createRectangle()
-				break
-			case 'ELLIPSE':
-				node = figma.createEllipse()
-				break
-			case 'TEXT':
-				node = figma.createText()
-				// 기본 폰트 로드
-				await figma.loadFontAsync({ family: 'Inter', style: 'Regular' })
-				node.fontName = { family: 'Inter', style: 'Regular' }
-				break
-			case 'VECTOR':
-				node = figma.createVector()
-				break
-			case 'LINE':
-				node = figma.createLine()
-				break
-			case 'STAR':
-				node = figma.createStar()
-				break
-			case 'POLYGON':
-				node = figma.createPolygon()
-				break
-			default:
-				node = figma.createFrame()
+		if (!command) {
+			throw new Error('The "command" property is missing in the custom JSON.');
 		}
 
-		// 기본 속성 설정
-		node.name = customData.name || name
-		if ('x' in customData) node.x = customData.x
-		else node.x = x
-		if ('y' in customData) node.y = customData.y
-		else node.y = y
-
-		// 크기 설정
-		if (customData.width && customData.height) {
-			node.resize(customData.width, customData.height)
-		} else if ('resize' in node) {
-			node.resize(100, 100) // 기본 크기
-		}
-
-		// Figma API 속성들 적용
-		const applyableProps = [
-			'visible', 'opacity', 'rotation', 'cornerRadius', 
-			'fills', 'strokes', 'strokeWeight', 'strokeAlign',
-			'strokeCap', 'strokeJoin', 'strokeMiterLimit',
-			'effects', 'blendMode', 'isMask', 'constraints',
-			'layoutMode', 'primaryAxisSizingMode', 'counterAxisSizingMode',
-			'primaryAxisAlignItems', 'counterAxisAlignItems',
-			'itemSpacing', 'padding', 'paddingLeft', 'paddingRight',
-			'paddingTop', 'paddingBottom', 'clipsContent'
-		]
-
-		applyableProps.forEach(prop => {
-			if (prop in customData && prop in node) {
-				try {
-					(node as any)[prop] = customData[prop]
-				} catch (propError) {
-					console.warn(`Failed to apply property ${prop}:`, propError)
-				}
-			}
-		})
-
-		// 텍스트 특수 처리
-		if (upperNodeType === 'TEXT' && customData.characters && 'characters' in node) {
-			(node as TextNode).characters = customData.characters
-		}
-
-		// 벡터 특수 처리
-		if (upperNodeType === 'VECTOR' && customData.vectorPaths && 'vectorPaths' in node) {
-			try {
-				(node as VectorNode).vectorPaths = customData.vectorPaths
-			} catch (vectorError) {
-				console.warn('Failed to apply vector paths:', vectorError)
-			}
-		}
-
-		// Add to parent or current page
-		if (parentId) {
-			try {
-				const parentNode = await figma.getNodeByIdAsync(parentId)
-				if (!parentNode) {
-					throw new Error(`Parent node not found with ID: ${parentId}`)
-				}
-				if (!('appendChild' in parentNode)) {
-					throw new Error(`Parent node does not support children: ${parentId}`)
-				}
-				(parentNode as ChildrenMixin).appendChild(node)
-			} catch (parentError) {
-				console.warn('Failed to add to parent, adding to current page:', (parentError as Error).message)
-				figma.currentPage.appendChild(node)
-			}
-		} else {
-			figma.currentPage.appendChild(node)
-		}
-
-		// Select the created node
-		figma.currentPage.selection = [node]
-		figma.viewport.scrollAndZoomIntoView([node])
-
-		return {
-			nodeId: node.id,
-			id: node.id,
-			name: node.name,
-			type: node.type,
-			x: node.x,
-			y: node.y,
-			width: 'width' in node ? node.width : undefined,
-			height: 'height' in node ? node.height : undefined,
-			appliedProperties: Object.keys(customData),
-			success: true
-		}
+		// 재귀적으로 handleCommand 호출
+		return await handleCommand(command, commandParams);
 
 	} catch (error) {
-		console.error('Error executing custom command:', error)
-		throw new Error(`Failed to execute custom command: ${(error as Error).message || error}`)
+		console.error('Error executing custom command:', error);
+		throw new Error(`Failed to execute custom command: ${(error as Error).message || error}`);
 	}
 }
 
