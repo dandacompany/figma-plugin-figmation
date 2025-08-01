@@ -9,22 +9,22 @@ graph TB
     subgraph "External AI Agent"
         A[AI Agent<br/>Claude/GPT/Gemini]
     end
-    
+
     subgraph "n8n Workflow"
-        B[MCP Server Trigger<br/>AI Agent 연결]
-        C[n8n Command Node<br/>Figma 명령 실행]
+        B[MCP Server Trigger<br/>AI Agent Connection]
+        C[n8n Command Node<br/>Figma Command Execution]
     end
-    
+
     subgraph "Communication Layer"
-        D[WebSocket Connector<br/>실시간 통신]
+        D[WebSocket Connector<br/>Real-time Communication]
     end
-    
+
     subgraph "Figma Plugin"
-        E[Figma Plugin<br/>명령 수신 및 실행]
+        E[Figma Plugin<br/>Command Reception & Execution]
     end
-    
+
     subgraph "Figma Design"
-        F[Figma Canvas<br/>디자인 결과물]
+        F[Figma Canvas<br/>Design Output]
     end
     
     A --> B

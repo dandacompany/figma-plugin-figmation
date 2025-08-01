@@ -202,7 +202,7 @@ async function handleCommand(command, params) {
 		'create_vector_path', 'create_button', 'create_boolean_operation',
 		'create_icon_from_svg', 'create_input_field', 'create_checkbox',
 		'create_toggle', 'create_symbol', 'create_avatar', 'create_progress_bar',
-		'create_slider', 'create_image_from_url'
+		'create_slider', 'create_image_from_url', 'create_group'
 	]
 
 	if (nodeCreationCommands.includes(command) && figma.editorType !== 'figma') {
@@ -246,6 +246,8 @@ async function handleCommand(command, params) {
 			return await setTextContent(params)
 		case 'get_styles':
 			return await getStyles()
+		case 'search_available_fonts':
+			return await searchAvailableFonts(params)
 		case 'get_local_components':
 			return await getLocalComponents()
 		case 'create_component_instance':
@@ -312,6 +314,8 @@ async function handleCommand(command, params) {
 			return await createIconFromSvg(params)
 		case 'create_svg_to_vector':
 			return await createSvgToVector(params)
+		case 'create_group':
+			return await createGroup(params)
 		case 'execute_custom_command':
 			return await executeCustomCommand(params)
 		case 'create_input_field':
@@ -1184,27 +1188,50 @@ async function createText(params) {
 
 		// Font loading and setting
 		let fontToUse = fontName
+		
+		// 디버깅: 파라미터 값 확인
+		console.log('🔍 폰트 파라미터 디버깅:', {
+			fontName,
+			initialFontToUse: fontToUse
+		})
+		
+		// 기본 폰트 설정
 		if (!fontToUse) {
 			fontToUse = { family: 'Inter', style: 'Regular' }
+			console.log('⚠️ 기본 폰트 사용:', fontToUse)
 		}
+		
+		console.log('🎯 최종 사용할 폰트:', fontToUse)
 
 		try {
 			await figma.loadFontAsync(fontToUse)
 			textNode.fontName = fontToUse
 		} catch (fontError) {
-			console.warn('Requested font not available, trying fallbacks')
-			try {
-				const fallbackFont = { family: 'Inter', style: 'Regular' }
-				await figma.loadFontAsync(fallbackFont)
-				textNode.fontName = fallbackFont
-			} catch (fallbackError) {
+			console.warn(`Requested font "${fontToUse.family}" not available, trying fallbacks`)
+			
+			// 폴백 폰트 순서: Noto Sans KR -> Inter -> Roboto
+			const fallbackFonts = [
+				{ family: 'Noto Sans KR', style: 'Regular' },
+				{ family: 'Inter', style: 'Regular' },
+				{ family: 'Roboto', style: 'Regular' }
+			]
+			
+			let fontLoaded = false
+			for (const fallbackFont of fallbackFonts) {
 				try {
-					const systemFont = { family: 'Roboto', style: 'Regular' }
-					await figma.loadFontAsync(systemFont)
-					textNode.fontName = systemFont
-				} catch (systemFontError) {
-					throw new Error('Unable to load any compatible font. Please ensure Inter or Roboto fonts are available.')
+					await figma.loadFontAsync(fallbackFont)
+					textNode.fontName = fallbackFont
+					console.log(`✅ 폰트 로드 성공: ${fallbackFont.family}`)
+					fontLoaded = true
+					break
+				} catch (fallbackError) {
+					console.warn(`❌ 폰트 로드 실패: ${fallbackFont.family}`)
+					continue
 				}
+			}
+			
+			if (!fontLoaded) {
+				throw new Error('Unable to load any compatible font. Please ensure Noto Sans KR, Inter, or Roboto fonts are available.')
 			}
 		}
 
@@ -1877,6 +1904,68 @@ async function getStyles() {
 			type: style.type,
 			effects: style.effects
 		}))
+	}
+}
+
+async function searchAvailableFonts(params) {
+	try {
+		const keyword = params?.keyword || ''
+		console.log(`🔍 사용 가능한 폰트 검색 중... (키워드: "${keyword}")`)
+		
+		// Figma API를 사용하여 사용 가능한 폰트 목록 조회
+		const fonts = await figma.listAvailableFontsAsync()
+		
+		console.log(`✅ 총 ${fonts.length}개의 폰트 발견`)
+		
+		// 폰트 정보 정리
+		let fontList = fonts.map(font => ({
+			family: font.fontName?.family || 'Unknown',
+			style: font.fontName?.style || 'Regular',
+			postScriptName: font.fontPostScriptName || 'Unknown'
+		}))
+		
+		// 키워드가 있으면 필터링 적용
+		if (keyword && keyword.trim() !== '') {
+			const searchTerm = keyword.toLowerCase().trim()
+			fontList = fontList.filter(font => 
+				(font.family && font.family.toLowerCase().includes(searchTerm)) ||
+				(font.style && font.style.toLowerCase().includes(searchTerm)) ||
+				(font.postScriptName && font.postScriptName.toLowerCase().includes(searchTerm))
+			)
+			console.log(`🎯 키워드 "${keyword}"로 필터링된 폰트: ${fontList.length}개`)
+		}
+		
+		// 폰트 패밀리별로 그룹화
+		const fontFamilies = {}
+		fontList.forEach(font => {
+			if (!fontFamilies[font.family]) {
+				fontFamilies[font.family] = []
+			}
+			fontFamilies[font.family].push({
+				style: font.style,
+				postScriptName: font.postScriptName
+			})
+		})
+		
+		// 통계 정보
+		const stats = {
+			totalFonts: fontList.length,
+			totalFamilies: Object.keys(fontFamilies).length,
+			families: Object.keys(fontFamilies).sort(),
+			searchKeyword: keyword,
+			isFiltered: keyword && keyword.trim() !== ''
+		}
+		
+		return {
+			success: true,
+			fonts: fontList,
+			fontFamilies: fontFamilies,
+			stats: stats,
+			timestamp: new Date().toISOString()
+		}
+	} catch (error) {
+		console.error('❌ 폰트 검색 실패:', error)
+		throw new Error(`Failed to search available fonts: ${error.message}`)
 	}
 }
 
@@ -4776,4 +4865,75 @@ function parseColor(colorString: string) {
 	}
 
 	return colorMap[colorString.toLowerCase() as keyof typeof colorMap] || null
+}
+
+// 그룹 생성 함수
+async function createGroup(params: any) {
+	const { 
+		nodeIds = [], 
+		name = `Group ${Date.now()}`, 
+		parentId = null 
+	} = params || {}
+
+	if (!nodeIds || nodeIds.length === 0) {
+		throw new Error('At least one node ID is required to create a group')
+	}
+
+	try {
+		// 노드 ID들을 배열로 변환 (쉼표로 구분된 문자열인 경우)
+		const nodeIdArray = Array.isArray(nodeIds) ? nodeIds : nodeIds.split(',').map((id: string) => id.trim())
+
+		// 노드들을 찾기
+		const nodes: SceneNode[] = []
+		for (const nodeId of nodeIdArray) {
+			const node = await figma.getNodeByIdAsync(nodeId)
+			if (!node) {
+				throw new Error(`Node with ID '${nodeId}' not found`)
+			}
+			// SceneNode 타입인지 확인 (그룹화 가능한 노드)
+			if (!('x' in node && 'y' in node && 'width' in node && 'height' in node)) {
+				throw new Error(`Node '${nodeId}' cannot be grouped (not a valid scene node type)`)
+			}
+			nodes.push(node as SceneNode)
+		}
+
+		// 부모 노드 결정
+		let parent: BaseNode
+		if (parentId) {
+			parent = await figma.getNodeByIdAsync(parentId)
+			if (!parent) {
+				throw new Error(`Parent node with ID '${parentId}' not found`)
+			}
+		} else {
+			parent = figma.currentPage
+		}
+
+		// 그룹 생성
+		const group = figma.group(nodes, parent)
+		
+		// 그룹 이름 설정
+		group.name = name
+
+		// 그룹을 선택하고 뷰포트에 맞춤
+		figma.currentPage.selection = [group]
+		figma.viewport.scrollAndZoomIntoView([group])
+
+		return {
+			nodeId: group.id,
+			id: group.id,
+			name: group.name,
+			type: group.type,
+			x: group.x,
+			y: group.y,
+			width: group.width,
+			height: group.height,
+			childrenCount: group.children.length,
+			groupedNodes: nodeIdArray,
+			success: true
+		}
+
+	} catch (error) {
+		console.error('Error creating group:', error)
+		throw new Error(`Failed to create group: ${(error as Error).message || error}`)
+	}
 }
