@@ -40,7 +40,8 @@
       "ws://localhost:3060",
       "https://images.unsplash.com",
       "https://picsum.photos",
-      "https://via.placeholder.com"
+      "https://via.placeholder.com",
+      "https://mdn.alipayobjects.com"
     ],
     "devAllowedDomains": [
       "http://localhost:6188",
