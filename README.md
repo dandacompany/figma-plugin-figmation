@@ -221,7 +221,7 @@ n8n Workflow → WebSocket Server → Figma Plugin → Figma API
 
 #### Instance Management Commands
 - `get_instance_overrides`: Get override properties of a component instance
-- `set_instance_overrides`: Apply overrides to a component instance
+- `set_instance_overrides`: Apply overrides to a component instance (supports TEXT, VARIANT, BOOLEAN, and INSTANCE_SWAP properties)
 - `detach_instance`: Detach instance from its main component
 
 #### Information Commands

@@ -44,6 +44,24 @@ export default function () {
 					figma.notify('Empty notification message received', { error: true })
 				}
 				break
+			case 'copy-to-clipboard':
+				// Handle clipboard copy request
+				try {
+					if (msg.text) {
+						// Send back to UI to handle copy
+						figma.ui.postMessage({
+							type: 'execute-copy',
+							text: msg.text
+						})
+						
+						// Show notification
+						figma.notify(`Copied: ${msg.text}`, { timeout: 2000 })
+					}
+				} catch (error) {
+					console.error('❌ Failed to copy to clipboard:', error)
+					figma.notify('Failed to copy to clipboard', { error: true })
+				}
+				break
 			case 'close-plugin':
 				// Cleanup work before plugin termination
 				try {
@@ -355,19 +373,196 @@ async function updateSettings(msg: any) {
 }
 
 // Send selection info to UI
-function updateSelectionInfo() {
+async function updateSelectionInfo() {
 	try {
 		const selection = figma.currentPage.selection
 		const selectionInfo = {
 			count: selection.length,
-			nodes: selection.map(node => ({
-				id: node.id,
-				name: node.name,
-				type: node.type,
-				x: 'x' in node ? node.x : 0,
-				y: 'y' in node ? node.y : 0,
-				width: 'width' in node ? node.width : 0,
-				height: 'height' in node ? node.height : 0
+			nodes: await Promise.all(selection.map(async node => {
+				const nodeInfo: any = {
+					id: node.id,
+					name: node.name,
+					type: node.type,
+					x: 'x' in node ? node.x : 0,
+					y: 'y' in node ? node.y : 0,
+					width: 'width' in node ? node.width : 0,
+					height: 'height' in node ? node.height : 0,
+					visible: node.visible,
+					locked: node.locked,
+					opacity: 'opacity' in node ? node.opacity : 1,
+					blendMode: 'blendMode' in node ? node.blendMode : 'NORMAL'
+				}
+
+				// Component properties
+				if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') {
+					nodeInfo.isComponentSet = node.type === 'COMPONENT_SET'
+					
+					if (node.type === 'COMPONENT') {
+						const component = node as ComponentNode
+						nodeInfo.key = component.key
+						nodeInfo.description = component.description
+						nodeInfo.documentationLinks = component.documentationLinks || []
+						
+						// Component properties
+						try {
+							// Check if component is part of a component set
+							if (component.parent?.type === 'COMPONENT_SET') {
+								const componentSet = component.parent as ComponentSetNode
+								const props = componentSet.componentPropertyDefinitions
+								nodeInfo.componentProperties = Object.entries(props).map(([key, prop]) => ({
+									key,
+									type: prop.type,
+									defaultValue: prop.defaultValue,
+									variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+								}))
+							} else {
+								// Standalone component
+								const props = component.componentPropertyDefinitions
+								nodeInfo.componentProperties = Object.entries(props).map(([key, prop]) => ({
+									key,
+									type: prop.type,
+									defaultValue: prop.defaultValue,
+									variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+								}))
+							}
+						} catch (err) {
+							console.warn('Error getting component properties:', err)
+							nodeInfo.componentProperties = []
+						}
+					}
+					
+					if (node.type === 'COMPONENT_SET') {
+						const componentSet = node as ComponentSetNode
+						nodeInfo.key = componentSet.key
+						nodeInfo.description = componentSet.description
+						nodeInfo.documentationLinks = componentSet.documentationLinks || []
+						nodeInfo.variantGroupProperties = componentSet.variantGroupProperties || {}
+						
+						// Component set properties
+						try {
+							const props = componentSet.componentPropertyDefinitions
+							nodeInfo.componentProperties = Object.entries(props).map(([key, prop]) => ({
+								key,
+								type: prop.type,
+								defaultValue: prop.defaultValue,
+								variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+							}))
+						} catch (err) {
+							console.warn('Error getting component set properties:', err)
+							nodeInfo.componentProperties = []
+						}
+					}
+				}
+
+				// Instance properties
+				if (node.type === 'INSTANCE') {
+					const instance = node as InstanceNode
+					try {
+						// Get main component async
+						const mainComponent = await instance.getMainComponentAsync()
+						nodeInfo.mainComponent = mainComponent ? {
+							id: mainComponent.id,
+							name: mainComponent.name,
+							key: mainComponent.key
+						} : null
+						
+						// Instance overrides
+						const properties = instance.componentProperties
+						if (properties && Object.keys(properties).length > 0) {
+							nodeInfo.componentProperties = properties
+						}
+						
+						// Get available properties from main component (including full property names)
+						if (mainComponent) {
+							try {
+								let availableProps: ComponentPropertyDefinitions = {}
+								
+								// Check if main component is part of a Component Set
+								if (mainComponent.parent?.type === 'COMPONENT_SET') {
+									const componentSet = mainComponent.parent as ComponentSetNode
+									if (componentSet.componentPropertyDefinitions) {
+										availableProps = componentSet.componentPropertyDefinitions
+									}
+								} else if (mainComponent.componentPropertyDefinitions) {
+									availableProps = mainComponent.componentPropertyDefinitions
+								}
+								
+								// Convert to array format with full property names
+								if (Object.keys(availableProps).length > 0) {
+									nodeInfo.availableProperties = Object.entries(availableProps).map(([key, prop]) => ({
+										key, // This will include the full key like "Title#929:0"
+										type: prop.type,
+										defaultValue: prop.defaultValue,
+										currentValue: properties?.[key],
+										variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+									}))
+								}
+							} catch (err) {
+								console.warn('Error getting available properties:', err)
+							}
+						}
+						
+						// Exposed instances
+						try {
+							const exposedInstances = instance.exposedInstances || []
+							nodeInfo.exposedInstances = exposedInstances.map(exp => ({
+								name: exp.name,
+								type: exp.type
+							}))
+						} catch (err) {
+							console.warn('Error getting exposed instances:', err)
+						}
+					} catch (err) {
+						console.warn('Error getting instance info:', err)
+					}
+				}
+
+				// Text properties
+				if (node.type === 'TEXT') {
+					const text = node as TextNode
+					nodeInfo.characters = text.characters
+					nodeInfo.fontSize = text.fontSize
+					nodeInfo.fontName = text.fontName
+					nodeInfo.textAlignHorizontal = text.textAlignHorizontal
+					nodeInfo.textAlignVertical = text.textAlignVertical
+				}
+
+				// Frame properties
+				if ('layoutMode' in node) {
+					nodeInfo.layoutMode = node.layoutMode
+					if (node.layoutMode !== 'NONE') {
+						nodeInfo.layoutDirection = 'layoutDirection' in node ? node.layoutDirection : null
+						nodeInfo.itemSpacing = node.itemSpacing
+						nodeInfo.paddingLeft = node.paddingLeft
+						nodeInfo.paddingRight = node.paddingRight
+						nodeInfo.paddingTop = node.paddingTop
+						nodeInfo.paddingBottom = node.paddingBottom
+					}
+				}
+
+				// Fill and stroke properties
+				if ('fills' in node && node.fills !== figma.mixed) {
+					nodeInfo.fillsCount = Array.isArray(node.fills) ? node.fills.length : 0
+				}
+				if ('strokes' in node) {
+					nodeInfo.strokesCount = Array.isArray(node.strokes) ? node.strokes.length : 0
+					nodeInfo.strokeWeight = node.strokeWeight
+				}
+
+				// Effects
+				if ('effects' in node) {
+					nodeInfo.effectsCount = Array.isArray(node.effects) ? node.effects.length : 0
+					if (node.effects.length > 0) {
+						nodeInfo.effectTypes = node.effects.map(e => e.type)
+					}
+				}
+
+				// Constraints
+				if ('constraints' in node) {
+					nodeInfo.constraints = node.constraints
+				}
+
+				return nodeInfo
 			}))
 		}
 

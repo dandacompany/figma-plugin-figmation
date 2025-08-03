@@ -828,11 +828,12 @@ export async function getInstanceOverrides(params: CommandParams): Promise<Comma
                 type: propDef.type,
                 defaultValue: propDef.defaultValue,
                 variantOptions: propDef.variantOptions,
-                currentValue: instance.componentProperties?.[propName] || propDef.defaultValue
+                currentValue: instance.componentProperties?.[propName] || propDef.defaultValue,
+                description: propDef.type === 'TEXT' ? 'Text property - can be modified via [Set Instance Overrides]' : undefined
               }
             }
           }
-        } else if (mainComponent.type === 'COMPONENT' && mainComponent.parent?.type !== 'COMPONENT_SET') {
+        } else if (mainComponent.componentPropertyDefinitions) {
           // Only non-variant components can have componentPropertyDefinitions
           if (mainComponent.componentPropertyDefinitions) {
             for (const [propName, propDef] of Object.entries(mainComponent.componentPropertyDefinitions)) {
@@ -840,7 +841,8 @@ export async function getInstanceOverrides(params: CommandParams): Promise<Comma
                 type: propDef.type,
                 defaultValue: propDef.defaultValue,
                 variantOptions: propDef.variantOptions,
-                currentValue: instance.componentProperties?.[propName] || propDef.defaultValue
+                currentValue: instance.componentProperties?.[propName] || propDef.defaultValue,
+                description: propDef.type === 'TEXT' ? 'Text property - can be modified via [Set Instance Overrides]' : undefined
               }
             }
           }
@@ -850,6 +852,85 @@ export async function getInstanceOverrides(params: CommandParams): Promise<Comma
       }
     }
     
+    // Get additional instance details like in UI
+    const instanceDetails: any = {
+      id: instance.id,
+      name: instance.name,
+      type: instance.type,
+      x: instance.x,
+      y: instance.y,
+      width: instance.width,
+      height: instance.height,
+      visible: instance.visible,
+      locked: instance.locked,
+      opacity: instance.opacity,
+      blendMode: instance.blendMode,
+      mainComponent: mainComponent ? {
+        id: mainComponent.id,
+        name: mainComponent.name,
+        key: mainComponent.key
+      } : null,
+      componentProperties: instance.componentProperties || {},
+      availableProperties: [] as any[],
+      exposedInstances: [] as any[]
+    }
+    
+    // Format available properties for better readability
+    instanceDetails.availableProperties = Object.entries(availableProperties).map(([key, prop]) => ({
+      key,
+      type: prop.type,
+      defaultValue: prop.defaultValue,
+      currentValue: prop.currentValue,
+      variantOptions: prop.variantOptions,
+      description: prop.description
+    }))
+    
+    // Get exposed instances
+    try {
+      const exposedInstances = instance.exposedInstances || []
+      instanceDetails.exposedInstances = exposedInstances.map(exp => ({
+        name: exp.name,
+        type: exp.type
+      }))
+    } catch (err) {
+      console.warn('Error getting exposed instances:', err)
+    }
+    
+    // Layout properties if applicable
+    if ('layoutMode' in instance) {
+      instanceDetails.layoutMode = instance.layoutMode
+      if (instance.layoutMode !== 'NONE') {
+        instanceDetails.layoutDirection = 'layoutDirection' in instance ? instance.layoutDirection : null
+        instanceDetails.itemSpacing = instance.itemSpacing
+        instanceDetails.paddingLeft = instance.paddingLeft
+        instanceDetails.paddingRight = instance.paddingRight
+        instanceDetails.paddingTop = instance.paddingTop
+        instanceDetails.paddingBottom = instance.paddingBottom
+      }
+    }
+    
+    // Fill and stroke information
+    if ('fills' in instance && instance.fills !== figma.mixed) {
+      instanceDetails.fillsCount = Array.isArray(instance.fills) ? instance.fills.length : 0
+    }
+    if ('strokes' in instance) {
+      instanceDetails.strokesCount = Array.isArray(instance.strokes) ? instance.strokes.length : 0
+      instanceDetails.strokeWeight = instance.strokeWeight
+    }
+    
+    // Effects
+    if ('effects' in instance) {
+      instanceDetails.effectsCount = Array.isArray(instance.effects) ? instance.effects.length : 0
+      if (instance.effects.length > 0) {
+        instanceDetails.effectTypes = instance.effects.map(e => e.type)
+      }
+    }
+    
+    // Constraints
+    if ('constraints' in instance) {
+      instanceDetails.constraints = instance.constraints
+    }
+
     return {
       success: true,
       nodeId: instance.id,
@@ -860,7 +941,9 @@ export async function getInstanceOverrides(params: CommandParams): Promise<Comma
       overrides: cleanedOverrides,
       hasOverrides: Object.keys(cleanedOverrides).length > 0,
       availableProperties: availableProperties,
-      componentProperties: instance.componentProperties || {}
+      componentProperties: instance.componentProperties || {},
+      // Enhanced instance details for n8n
+      instanceDetails: instanceDetails
     }
     
   } catch (error) {
@@ -891,12 +974,12 @@ export async function setInstanceOverrides(params: CommandParams): Promise<Comma
     
     const instance = node as InstanceNode
     let propertiesApplied = 0
-    let textOverridesApplied = 0
+    let textPropertiesApplied = 0
     let totalRequested = 0
     const appliedProperties: Record<string, any> = {}
-    const appliedTextOverrides: Record<string, string> = {}
+    const appliedTextProperties: Record<string, string> = {}
     
-    // Apply component properties (variants) - Only this is supported by Figma Plugin API
+    // Apply component properties (including TEXT properties)
     if (overrides.componentProperties) {
       console.log('Setting component properties:', overrides.componentProperties)
       
@@ -922,33 +1005,105 @@ export async function setInstanceOverrides(params: CommandParams): Promise<Comma
         }
       }
       
-      for (const [key, value] of Object.entries(overrides.componentProperties)) {
+      // Create mapping from simple names to full keys (for dynamic IDs like "Title#929:1")
+      const keyMapping: Record<string, string> = {}
+      Object.keys(availableProperties).forEach(fullKey => {
+        // Extract simple name by removing ID suffix (e.g., "Title#929:1" -> "Title")
+        const simpleName = fullKey.split('#')[0]
+        keyMapping[simpleName] = fullKey
+      })
+      
+      console.log('Key mapping for dynamic IDs:', keyMapping)
+      
+      // Prepare properties object for setProperties() call
+      const propertiesToSet: Record<string, any> = {}
+      
+      for (const [userKey, value] of Object.entries(overrides.componentProperties)) {
         totalRequested++
-        console.log(`Attempting to set property "${key}" to "${value}"`)
+        
+        // Map user-provided key to actual key (with dynamic ID)
+        let actualKey = keyMapping[userKey] || userKey // Use mapping or fallback to original
+        console.log(`Attempting to set property "${userKey}" (mapped to "${actualKey}") to "${value}"`)
         
         // Check if property exists in available properties
-        if (Object.keys(availableProperties).length > 0 && !availableProperties[key]) {
-          console.warn(`Property "${key}" is not available in component. Available properties:`, Object.keys(availableProperties))
+        let propertyDef = availableProperties[actualKey]
+        if (Object.keys(availableProperties).length > 0 && !propertyDef) {
+          console.warn(`Property "${actualKey}" is not available in component. Available properties:`, Object.keys(availableProperties))
+          // Try without mapping as fallback
+          const fallbackDef = availableProperties[userKey]
+          if (!fallbackDef) {
+            continue
+          }
+          // Use the original key if fallback works
+          propertyDef = fallbackDef
+          actualKey = userKey
         }
         
-        // Check if value is valid for the property
-        if (availableProperties[key]?.variantOptions && !availableProperties[key].variantOptions.includes(value)) {
-          console.warn(`Value "${value}" is not valid for property "${key}". Valid options:`, availableProperties[key].variantOptions)
-        }
-        
-        try {
-          instance.setProperties({ [key]: value })
-          appliedProperties[key] = value
+        // Validate property based on type
+        if (propertyDef) {
+          // Handle TEXT properties
+          if (propertyDef.type === 'TEXT') {
+            console.log(`Property "${actualKey}" is a TEXT property`)
+            propertiesToSet[actualKey] = String(value)
+            appliedTextProperties[userKey] = String(value) // Store with user key for clarity
+            textPropertiesApplied++
+          }
+          // Handle VARIANT properties
+          else if (propertyDef.type === 'VARIANT') {
+            if (propertyDef.variantOptions && !propertyDef.variantOptions.includes(value)) {
+              console.warn(`Value "${value}" is not valid for property "${actualKey}". Valid options:`, propertyDef.variantOptions)
+              continue
+            }
+            propertiesToSet[actualKey] = value
+            appliedProperties[userKey] = value // Store with user key for clarity
+            propertiesApplied++
+          }
+          // Handle BOOLEAN properties
+          else if (propertyDef.type === 'BOOLEAN') {
+            const boolValue = value === true || value === 'true' || value === 1 || value === '1'
+            propertiesToSet[actualKey] = boolValue
+            appliedProperties[userKey] = boolValue // Store with user key for clarity
+            propertiesApplied++
+          }
+          // Handle INSTANCE_SWAP properties
+          else if (propertyDef.type === 'INSTANCE_SWAP') {
+            propertiesToSet[actualKey] = value
+            appliedProperties[userKey] = value // Store with user key for clarity
+            propertiesApplied++
+          }
+        } else {
+          // If we don't have property definitions, just try to set it
+          propertiesToSet[actualKey] = value
+          appliedProperties[userKey] = value // Store with user key for clarity
           propertiesApplied++
-          console.log(`Successfully set property "${key}" to "${value}"`)
-        } catch (error) {
-          console.error(`Failed to set property "${key}" to "${value}":`, error)
-          console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-            propertyType: availableProperties[key]?.type,
-            expectedOptions: availableProperties[key]?.variantOptions
+        }
+      }
+      
+      // Apply all properties at once using setProperties()
+      if (Object.keys(propertiesToSet).length > 0) {
+        try {
+          instance.setProperties(propertiesToSet)
+          console.log('✅ Successfully applied properties with key mapping:', {
+            userProvided: overrides.componentProperties,
+            keyMapping: keyMapping,
+            actualApplied: propertiesToSet
           })
+        } catch (error) {
+          console.error('Failed to set properties:', error)
+          console.error('Properties that failed:', propertiesToSet)
+          // Try fallback without mapping
+          try {
+            instance.setProperties(overrides.componentProperties)
+            console.log('Applied properties without mapping as fallback')
+            // Update applied properties based on original keys
+            Object.entries(overrides.componentProperties).forEach(([key, value]) => {
+              appliedProperties[key] = value
+              propertiesApplied++
+            })
+          } catch (fallbackError) {
+            console.error('Fallback property setting also failed:', fallbackError)
+            throw error
+          }
         }
       }
     }
@@ -957,22 +1112,131 @@ export async function setInstanceOverrides(params: CommandParams): Promise<Comma
     figma.currentPage.selection = [instance]
     figma.viewport.scrollAndZoomIntoView([instance])
     
+    const totalApplied = propertiesApplied + textPropertiesApplied
+    
+    // Get updated instance details after applying overrides
+    const mainComponent = await instance.getMainComponentAsync()
+    const instanceDetails: any = {
+      id: instance.id,
+      name: instance.name,
+      type: instance.type,
+      x: instance.x,
+      y: instance.y,
+      width: instance.width,
+      height: instance.height,
+      visible: instance.visible,
+      locked: instance.locked,
+      opacity: instance.opacity,
+      blendMode: instance.blendMode,
+      mainComponent: mainComponent ? {
+        id: mainComponent.id,
+        name: mainComponent.name,
+        key: mainComponent.key
+      } : null,
+      componentProperties: instance.componentProperties || {},
+      availableProperties: [] as any[],
+      exposedInstances: [] as any[]
+    }
+    
+    // Get available properties from main component (including full property names)
+    if (mainComponent) {
+      try {
+        let availableProps: ComponentPropertyDefinitions = {}
+        
+        // Check if main component is part of a Component Set
+        if (mainComponent.parent?.type === 'COMPONENT_SET') {
+          const componentSet = mainComponent.parent as ComponentSetNode
+          if (componentSet.componentPropertyDefinitions) {
+            availableProps = componentSet.componentPropertyDefinitions
+          }
+        } else if (mainComponent.componentPropertyDefinitions) {
+          availableProps = mainComponent.componentPropertyDefinitions
+        }
+        
+        // Convert to array format with full property names
+        if (Object.keys(availableProps).length > 0) {
+          instanceDetails.availableProperties = Object.entries(availableProps).map(([key, prop]) => ({
+            key, // This will include the full key like "Title#929:0"
+            type: prop.type,
+            defaultValue: prop.defaultValue,
+            currentValue: instance.componentProperties?.[key],
+            variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+          }))
+        }
+      } catch (err) {
+        console.warn('Error getting available properties:', err)
+      }
+    }
+    
+    // Get exposed instances
+    try {
+      const exposedInstances = instance.exposedInstances || []
+      instanceDetails.exposedInstances = exposedInstances.map(exp => ({
+        name: exp.name,
+        type: exp.type
+      }))
+    } catch (err) {
+      console.warn('Error getting exposed instances:', err)
+    }
+    
+    // Layout properties if applicable
+    if ('layoutMode' in instance) {
+      instanceDetails.layoutMode = instance.layoutMode
+      if (instance.layoutMode !== 'NONE') {
+        instanceDetails.layoutDirection = 'layoutDirection' in instance ? instance.layoutDirection : null
+        instanceDetails.itemSpacing = instance.itemSpacing
+        instanceDetails.paddingLeft = instance.paddingLeft
+        instanceDetails.paddingRight = instance.paddingRight
+        instanceDetails.paddingTop = instance.paddingTop
+        instanceDetails.paddingBottom = instance.paddingBottom
+      }
+    }
+    
+    // Fill and stroke information
+    if ('fills' in instance && instance.fills !== figma.mixed) {
+      instanceDetails.fillsCount = Array.isArray(instance.fills) ? instance.fills.length : 0
+    }
+    if ('strokes' in instance) {
+      instanceDetails.strokesCount = Array.isArray(instance.strokes) ? instance.strokes.length : 0
+      instanceDetails.strokeWeight = instance.strokeWeight
+    }
+    
+    // Effects
+    if ('effects' in instance) {
+      instanceDetails.effectsCount = Array.isArray(instance.effects) ? instance.effects.length : 0
+      if (instance.effects.length > 0) {
+        instanceDetails.effectTypes = instance.effects.map(e => e.type)
+      }
+    }
+    
+    // Constraints
+    if ('constraints' in instance) {
+      instanceDetails.constraints = instance.constraints
+    }
+    
     return {
       success: true,
       nodeId: instance.id,
       nodeName: instance.name,
       nodeType: instance.type,
       componentPropertiesApplied: propertiesApplied,
+      textPropertiesApplied: textPropertiesApplied,
+      totalApplied: totalApplied,
       totalRequested: totalRequested,
       appliedProperties: appliedProperties,
-      message: propertiesApplied > 0 
-        ? `Successfully applied ${propertiesApplied} component properties.`
-        : 'No component properties were applied.'
+      appliedTextProperties: appliedTextProperties,
+      originalPropertiesInput: overrides.componentProperties,
+      message: totalApplied > 0 
+        ? `Successfully applied ${totalApplied} properties (${propertiesApplied} component properties, ${textPropertiesApplied} text properties).`
+        : 'No properties were applied.',
+      // Enhanced instance details for n8n
+      instanceDetails: instanceDetails
     }
     
   } catch (error) {
     console.error('Error setting instance overrides:', error)
-    throw new Error(`Failed to set instance overrides: ${error.message || error}`)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to set instance overrides: ${errorMessage}`)
   }
 }
 
@@ -1005,7 +1269,7 @@ export async function detachInstance(params: CommandParams): Promise<CommandResu
       key: mainComponent.key
     } : null
     
-    // Store instance info before detaching
+    // Store detailed instance info before detaching
     const instanceInfo = {
       id: instance.id,
       name: instance.name,
@@ -1013,7 +1277,54 @@ export async function detachInstance(params: CommandParams): Promise<CommandResu
       y: instance.y,
       width: instance.width,
       height: instance.height,
-      componentProperties: instance.componentProperties || {}
+      visible: instance.visible,
+      locked: instance.locked,
+      opacity: instance.opacity,
+      blendMode: instance.blendMode,
+      componentProperties: instance.componentProperties || {},
+      availableProperties: [] as any[],
+      exposedInstances: [] as any[]
+    }
+    
+    // Get available properties before detaching
+    if (mainComponent) {
+      try {
+        let availableProps: ComponentPropertyDefinitions = {}
+        
+        // Check if main component is part of a Component Set
+        if (mainComponent.parent?.type === 'COMPONENT_SET') {
+          const componentSet = mainComponent.parent as ComponentSetNode
+          if (componentSet.componentPropertyDefinitions) {
+            availableProps = componentSet.componentPropertyDefinitions
+          }
+        } else if (mainComponent.componentPropertyDefinitions) {
+          availableProps = mainComponent.componentPropertyDefinitions
+        }
+        
+        // Convert to array format with full property names
+        if (Object.keys(availableProps).length > 0) {
+          instanceInfo.availableProperties = Object.entries(availableProps).map(([key, prop]) => ({
+            key, // This will include the full key like "Title#929:0"
+            type: prop.type,
+            defaultValue: prop.defaultValue,
+            currentValue: instance.componentProperties?.[key],
+            variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+          }))
+        }
+      } catch (err) {
+        console.warn('Error getting available properties before detach:', err)
+      }
+    }
+    
+    // Get exposed instances before detaching
+    try {
+      const exposedInstances = instance.exposedInstances || []
+      instanceInfo.exposedInstances = exposedInstances.map(exp => ({
+        name: exp.name,
+        type: exp.type
+      }))
+    } catch (err) {
+      console.warn('Error getting exposed instances before detach:', err)
     }
     
     // Detach the instance
@@ -1021,6 +1332,61 @@ export async function detachInstance(params: CommandParams): Promise<CommandResu
     
     if (!detachedNode) {
       throw new Error('Failed to detach instance - detachInstance returned null')
+    }
+    
+    // Collect detailed info about the detached node
+    const detachedNodeDetails: any = {
+      id: detachedNode.id,
+      name: detachedNode.name,
+      type: detachedNode.type,
+      x: 'x' in detachedNode ? detachedNode.x : 0,
+      y: 'y' in detachedNode ? detachedNode.y : 0,
+      width: 'width' in detachedNode ? detachedNode.width : 0,
+      height: 'height' in detachedNode ? detachedNode.height : 0,
+      visible: detachedNode.visible,
+      locked: detachedNode.locked,
+      opacity: 'opacity' in detachedNode ? detachedNode.opacity : 1,
+      blendMode: 'blendMode' in detachedNode ? detachedNode.blendMode : 'NORMAL'
+    }
+    
+    // Layout properties if applicable
+    if ('layoutMode' in detachedNode) {
+      detachedNodeDetails.layoutMode = detachedNode.layoutMode
+      if (detachedNode.layoutMode !== 'NONE') {
+        detachedNodeDetails.layoutDirection = 'layoutDirection' in detachedNode ? detachedNode.layoutDirection : null
+        detachedNodeDetails.itemSpacing = detachedNode.itemSpacing
+        detachedNodeDetails.paddingLeft = detachedNode.paddingLeft
+        detachedNodeDetails.paddingRight = detachedNode.paddingRight
+        detachedNodeDetails.paddingTop = detachedNode.paddingTop
+        detachedNodeDetails.paddingBottom = detachedNode.paddingBottom
+      }
+    }
+    
+    // Fill and stroke information
+    if ('fills' in detachedNode && detachedNode.fills !== figma.mixed) {
+      detachedNodeDetails.fillsCount = Array.isArray(detachedNode.fills) ? detachedNode.fills.length : 0
+    }
+    if ('strokes' in detachedNode) {
+      detachedNodeDetails.strokesCount = Array.isArray(detachedNode.strokes) ? detachedNode.strokes.length : 0
+      detachedNodeDetails.strokeWeight = detachedNode.strokeWeight
+    }
+    
+    // Effects
+    if ('effects' in detachedNode) {
+      detachedNodeDetails.effectsCount = Array.isArray(detachedNode.effects) ? detachedNode.effects.length : 0
+      if (detachedNode.effects.length > 0) {
+        detachedNodeDetails.effectTypes = detachedNode.effects.map(e => e.type)
+      }
+    }
+    
+    // Constraints
+    if ('constraints' in detachedNode) {
+      detachedNodeDetails.constraints = detachedNode.constraints
+    }
+    
+    // Children count if applicable
+    if ('children' in detachedNode) {
+      detachedNodeDetails.childrenCount = detachedNode.children.length
     }
     
     // Select the detached node
@@ -1040,11 +1406,15 @@ export async function detachInstance(params: CommandParams): Promise<CommandResu
       originalInstanceId: instanceInfo.id,
       mainComponent: mainComponentInfo,
       detachedFrom: mainComponentInfo?.name || 'Unknown Component',
-      message: `Successfully detached instance from component: ${mainComponentInfo?.name || 'Unknown'}`
+      message: `Successfully detached instance from component: ${mainComponentInfo?.name || 'Unknown'}`,
+      // Enhanced details for n8n
+      instanceBeforeDetach: instanceInfo,
+      detachedNodeDetails: detachedNodeDetails
     }
     
   } catch (error) {
     console.error('Error detaching instance:', error)
-    throw new Error(`Failed to detach instance: ${error.message || error}`)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to detach instance: ${errorMessage}`)
   }
 }

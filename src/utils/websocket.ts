@@ -80,7 +80,7 @@ export class WebSocketClient {
         console.error('WebSocket error:', error)
       }
     } catch (e) {
-      console.error('Failed to create WebSocket:', e)
+      // console.error('Failed to create WebSocket:', e)
       this.reconnect()
     }
   }
@@ -133,10 +133,10 @@ export class WebSocketClient {
     )
 
     this.reconnectAttempts++
-    console.log(`Reconnecting in ${timeout / 1000} seconds...`)
+    // console.log(`Reconnecting in ${timeout / 1000} seconds...`)
 
     setTimeout(() => {
-      console.log('Attempting to reconnect...')
+      // console.log('Attempting to reconnect...')
       this.connect()
     }, timeout)
   }

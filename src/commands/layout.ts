@@ -4,6 +4,9 @@ import { CommandParams, CommandResult } from '../types'
 import { generateNodeName, appendToParent, createNodeResult, normalizeNodeId, getNodeByIdSafe } from '../utils/nodes'
 import { createColorPaint } from '../utils/colors'
 
+// Import for component property types
+type ComponentPropertyDefinitions = Record<string, ComponentPropertyDefinition>
+
 // Create Frame
 export async function createFrame(params: CommandParams): Promise<CommandResult> {
   if (figma.editorType !== 'figma') {
@@ -217,13 +220,87 @@ export async function createInstance(params: CommandParams): Promise<CommandResu
       instance = defaultVariant.createInstance()
     }
 
-    // Apply component properties (variants) if provided
-    if (Object.keys(componentProperties).length > 0 && instance.componentProperties) {
+    // Get main component for both property application and details
+    const mainComponent = await instance.getMainComponentAsync()
+    
+    // Apply component properties if provided
+    // Note: We need to do this AFTER getting the main component to handle dynamic property keys
+    let appliedProperties = {}
+    if (Object.keys(componentProperties).length > 0) {
       try {
-        instance.setProperties(componentProperties)
+        if (mainComponent) {
+          // Get available properties with their full keys (including dynamic IDs)
+          let availableProps: ComponentPropertyDefinitions = {}
+          
+          // Check if main component is part of a Component Set
+          if (mainComponent.parent?.type === 'COMPONENT_SET') {
+            const componentSet = mainComponent.parent as ComponentSetNode
+            if (componentSet.componentPropertyDefinitions) {
+              availableProps = componentSet.componentPropertyDefinitions
+            }
+          } else if (mainComponent.componentPropertyDefinitions) {
+            availableProps = mainComponent.componentPropertyDefinitions
+          }
+          
+          // Create mapping from simple names to full keys (case-insensitive)
+          const keyMapping: Record<string, string> = {}
+          const lowercaseMapping: Record<string, string> = {}
+          Object.keys(availableProps).forEach(fullKey => {
+            // Extract simple name by removing ID suffix (e.g., "Title#929:1" -> "Title")
+            const simpleName = fullKey.split('#')[0]
+            keyMapping[simpleName] = fullKey
+            // Also create lowercase mapping for case-insensitive matching
+            lowercaseMapping[simpleName.toLowerCase()] = fullKey
+          })
+          
+          console.log('Available property keys:', Object.keys(availableProps))
+          console.log('Key mapping created:', keyMapping)
+          
+          // Map user-provided properties to actual property keys
+          const mappedProperties: Record<string, any> = {}
+          Object.entries(componentProperties).forEach(([userKey, value]) => {
+            // Try exact match first
+            let actualKey = keyMapping[userKey]
+            
+            // If no exact match, try case-insensitive match
+            if (!actualKey) {
+              actualKey = lowercaseMapping[userKey.toLowerCase()]
+            }
+            
+            // If still no match, use original key as fallback
+            if (!actualKey) {
+              console.warn(`No mapping found for property "${userKey}", using as-is`)
+              actualKey = userKey
+            }
+            
+            mappedProperties[actualKey] = value
+          })
+          
+          // Apply the mapped properties
+          if (Object.keys(mappedProperties).length > 0) {
+            instance.setProperties(mappedProperties)
+            appliedProperties = mappedProperties
+            console.log('✅ Applied component properties with key mapping:', {
+              userProvided: componentProperties,
+              keyMapping: keyMapping,
+              actualApplied: mappedProperties
+            })
+          }
+        } else {
+          // Fallback to direct application if no main component
+          instance.setProperties(componentProperties)
+          appliedProperties = componentProperties
+        }
       } catch (propError) {
         console.warn('Error setting component properties:', propError)
-        // Continue even if some properties fail
+        // Try fallback without mapping
+        try {
+          instance.setProperties(componentProperties)
+          appliedProperties = componentProperties
+          console.log('Applied properties without mapping as fallback')
+        } catch (fallbackError) {
+          console.warn('Fallback property setting also failed:', fallbackError)
+        }
       }
     }
 
@@ -248,14 +325,70 @@ export async function createInstance(params: CommandParams): Promise<CommandResu
     // Scroll and zoom to show the new instance
     figma.viewport.scrollAndZoomIntoView([instance])
 
-    // Get main component using async method
-    const mainComponent = await instance.getMainComponentAsync()
+    // Main component already fetched above for property application
+    
+    // Collect detailed instance properties similar to UI
+    const instanceDetails: any = {
+      mainComponent: mainComponent ? {
+        id: mainComponent.id,
+        name: mainComponent.name,
+        key: mainComponent.key
+      } : null,
+      componentProperties: instance.componentProperties || {},
+      availableProperties: [] as any[] as any[],
+      appliedProperties: appliedProperties,
+      originalPropertiesInput: componentProperties
+    }
+    
+    // Get available properties from main component (including full property names)
+    if (mainComponent) {
+      try {
+        let availableProps: ComponentPropertyDefinitions = {}
+        
+        // Check if main component is part of a Component Set
+        if (mainComponent.parent?.type === 'COMPONENT_SET') {
+          const componentSet = mainComponent.parent as ComponentSetNode
+          if (componentSet.componentPropertyDefinitions) {
+            availableProps = componentSet.componentPropertyDefinitions
+          }
+        } else if (mainComponent.componentPropertyDefinitions) {
+          availableProps = mainComponent.componentPropertyDefinitions
+        }
+        
+        // Convert to array format with full property names
+        if (Object.keys(availableProps).length > 0) {
+          instanceDetails.availableProperties = Object.entries(availableProps).map(([key, prop]) => ({
+            key, // This will include the full key like "Title#929:0"
+            type: prop.type,
+            defaultValue: prop.defaultValue,
+            currentValue: instance.componentProperties?.[key],
+            variantOptions: prop.type === 'VARIANT' ? prop.variantOptions : undefined
+          }))
+        }
+      } catch (err) {
+        console.warn('Error getting available properties:', err)
+      }
+    }
+    
+    // Get exposed instances
+    try {
+      const exposedInstances = instance.exposedInstances || []
+      instanceDetails.exposedInstances = exposedInstances.map(exp => ({
+        name: exp.name,
+        type: exp.type
+      }))
+    } catch (err) {
+      console.warn('Error getting exposed instances:', err)
+    }
 
     return {
       ...createNodeResult(instance, actualParentId),
       mainComponentId: mainComponent?.id,
-      appliedProperties: componentProperties,
-      hasOverrides: Object.keys(overrides).length > 0
+      appliedProperties: appliedProperties,
+      originalPropertiesInput: componentProperties,
+      hasOverrides: Object.keys(overrides).length > 0,
+      // Enhanced instance details for n8n
+      instanceDetails: instanceDetails
     }
 
   } catch (error) {

@@ -16,6 +16,7 @@ const App: React.FC = () => {
 	const [channelList, setChannelList] = useState<any[]>([])
 	const [currentChannel, setCurrentChannel] = useState<any>(null)
 	const [isSetupInstructionsExpanded, setIsSetupInstructionsExpanded] = useState<boolean>(false)
+	const [copiedId, setCopiedId] = useState<string | null>(null)
 	
 	// WebSocket reference
 	const wsRef = useRef<WebSocket | null>(null)
@@ -28,11 +29,11 @@ const App: React.FC = () => {
 	const serverUrl = `ws://localhost:${serverPort}`
 	
 	// Debug logging
-	console.log('🔍 URL Debug Info:', {
-		serverPort,
-		channelId,
-		finalUrl: serverUrl
-	})
+	// console.log('🔍 URL Debug Info:', {
+	// 	serverPort,
+	// 	channelId,
+	// 	finalUrl: serverUrl
+	// })
 
 	// Handle messages from the plugin
 	useEffect(() => {
@@ -60,7 +61,8 @@ const App: React.FC = () => {
 					break
 				
 				case 'selection-changed':
-					setSelectionInfo(message.selection || [])
+					console.log('Selection changed:', message.selection)
+					setSelectionInfo(message.selection?.nodes || [])
 					break
 				
 				case 'command-result':
@@ -70,6 +72,23 @@ const App: React.FC = () => {
 				case 'command-error':
 					handleCommandError(message.id, message.error)
 					break
+				
+				case 'execute-copy':
+					// Execute copy in UI context
+					try {
+						const textArea = document.createElement('textarea')
+						textArea.value = message.text
+						textArea.style.position = 'fixed'
+						textArea.style.left = '-999999px'
+						document.body.appendChild(textArea)
+						textArea.select()
+						document.execCommand('copy')
+						document.body.removeChild(textArea)
+					} catch (err) {
+						console.error('Failed to execute copy:', err)
+					}
+					break
+				
 			}
 		}
 
@@ -134,46 +153,46 @@ const App: React.FC = () => {
 				lastPongTime.current = Date.now()
 				console.log('Initial lastPongTime set to:', lastPongTime.current)
 				
-				// 연결 성공 메시지 (채널 ID 포함)
+				// Connection success message (including channel ID)
 				const registerMessage = {
 					type: 'register',
 					clientType: 'figma',
 					clientId: 'figma_plugin_' + Date.now(),
-					channelId: channelId || 'hellofigma', // 기본 채널 ID 사용
+					channelId: channelId || 'hellofigma', // Use default channel ID
 					message: 'Figma plugin connected'
 				}
 				console.log('Sending register message:', registerMessage)
 				ws.send(JSON.stringify(registerMessage))
 				
-				// 연결 상태 주기적 체크 시작
+				// Start periodic connection status check
 				startConnectionCheck()
 			}
 
 			ws.onmessage = (event) => {
 				try {
 					const data = JSON.parse(event.data)
-					console.log('Received message:', data)
+					// console.log('Received message:', data)
 					
-					// ping/pong 응답 처리
+					// Handle ping/pong response
 					if (data.type === 'pong') {
-						console.log('Received pong response')
+						// console.log('Received pong response')
 						lastPongTime.current = Date.now()
 						return
 					}
 					
-					// 등록 성공 응답 처리
+					// Handle registration success response
 					if (data.type === 'registration_success') {
 						console.log('Registration successful:', data)
 						setCurrentChannel({
 							id: data.channelId,
 							clientId: data.clientId
 						})
-						// 서버에서 할당된 채널 ID로 업데이트
+						// Update with channel ID assigned by server
 						setChannelId(data.channelId)
 						return
 					}
 					
-					// 등록 에러 처리
+					// Handle registration error
 					if (data.type === 'registration_error') {
 						console.error('Registration failed:', data.error)
 						setConnectionStatus('Registration Failed: ' + data.error)
@@ -181,28 +200,28 @@ const App: React.FC = () => {
 						return
 					}
 					
-					// 새 채널 생성 브로드캐스트 처리
+					// Handle new channel creation broadcast
 					if (data.type === 'channel_created_broadcast') {
 						console.log('New channel created:', data.channelId, data.channelName)
 						console.log('Setting channel ID to:', data.channelId)
-						// 자동으로 채널 ID 설정
+						// Automatically set channel ID
 						setChannelId(data.channelId)
-						// 알림 메시지 표시
+						// Show notification message
 						setConnectionStatus(`Channel "${data.channelId}" is ready for connection!`)
 						console.log('Channel ID set successfully')
 						return
 					}
 					
-					// 채널 목록 업데이트 처리
+					// Handle channel list update
 					if (data.type === 'channel_list') {
 						console.log('Channel list updated:', data.channels)
 						setChannelList(data.channels)
 						return
 					}
 					
-						// 외부 명령 처리
+						// Handle external command
 	if (data.type === 'command') {
-		console.log('📨 외부 명령 수신:', data);
+		console.log('📨 External command received:', data);
 		executeCommand(data)
 	}
 				} catch (error) {
@@ -221,7 +240,7 @@ const App: React.FC = () => {
 				setConnectionStatus('Disconnected')
 				wsRef.current = null
 				
-				// 연결 체크 인터벌 정리
+				// Clean up connection check interval
 				if (connectionCheckInterval.current) {
 					clearInterval(connectionCheckInterval.current)
 					connectionCheckInterval.current = null
@@ -233,10 +252,10 @@ const App: React.FC = () => {
 		}
 	}
 
-	// ping 메시지 전송
+	// Send ping message
 	const sendPing = () => {
 		if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-			console.log('Sending ping...')
+			// console.log('Sending ping...')
 			try {
 				wsRef.current.send(JSON.stringify({ type: 'ping' }))
 			} catch (error) {
@@ -247,11 +266,11 @@ const App: React.FC = () => {
 		}
 	}
 
-	// 연결 상태 주기적 체크
+	// Periodic connection status check
 	const startConnectionCheck = () => {
 		// console.log('Starting connection check interval...')
 		
-		// 기존 인터벌 정리
+		// Clean up existing intervals
 		if (connectionCheckInterval.current) {
 			// console.log('Clearing existing connection check interval')
 			clearInterval(connectionCheckInterval.current)
@@ -261,17 +280,17 @@ const App: React.FC = () => {
 			clearInterval(pingInterval.current)
 		}
 		
-		// 자동 재연결 시도 횟수 제한
+		// Limit automatic reconnection attempts
 		let reconnectAttempts = 0
 		const maxReconnectAttempts = 5
 		
-		// 5초마다 ping 전송 (서버 상태 빠른 감지)
+		// Send ping every 5 seconds (fast server status detection)
 		pingInterval.current = setInterval(() => {
 			// console.log('Ping interval triggered')
 			sendPing()
 		}, 5000)
 		
-		// 5초마다 연결 상태 체크 (서버 상태 빠른 감지)
+		// Check connection status every 5 seconds (fast server status detection)
 		connectionCheckInterval.current = setInterval(() => {
 			// console.log('Connection check running...')
 			
@@ -287,10 +306,10 @@ const App: React.FC = () => {
 				// })
 				// console.log('Time since last pong:', timeSinceLastPong, 'ms')
 				
-				// 연결 상태 모니터링 (readyState + ping/pong 기반)
+				// Connection status monitoring (readyState + ping/pong based)
 				if (readyState === WebSocket.CLOSED || 
 					readyState === WebSocket.CLOSING || 
-					timeSinceLastPong > 30000) { // 30초 이상 pong이 없으면 연결 끊김으로 판단
+					timeSinceLastPong > 30000) { // Consider connection lost if no pong for 30+ seconds
 					// console.log('Connection lost - updating status')
 					// console.log('Reason:', {
 					// 	readyStateClosed: readyState === WebSocket.CLOSED,
@@ -303,12 +322,12 @@ const App: React.FC = () => {
 					setConnectionStatus('Disconnected')
 					wsRef.current = null
 					
-					// 자동 재연결 시도
+					// Automatic reconnection attempt
 					if (reconnectAttempts < maxReconnectAttempts) {
 						reconnectAttempts++
 						console.log(`Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`)
 						
-						// 3초 후 재연결 시도
+						// Attempt reconnection after 3 seconds
 						setTimeout(() => {
 							console.log('Attempting automatic reconnection...')
 							connectToWebSocket()
@@ -317,9 +336,9 @@ const App: React.FC = () => {
 						console.log('Max reconnection attempts reached, stopping auto-reconnect')
 					}
 				} else {
-					// 연결이 활성 상태인 경우 상태 업데이트
+					// Update status when connection is active
 					if (!isConnected) {
-						console.log('Connection restored - updating status')
+						// console.log('Connection restored - updating status')
 						setIsConnected(true)
 						setConnectionStatus('Connected')
 					}
@@ -333,7 +352,7 @@ const App: React.FC = () => {
 		// console.log('Connection check interval started')
 	}
 
-	// WebSocket 연결 해제
+	// Disconnect WebSocket
 	const disconnectWebSocket = () => {
 		console.log('Disconnecting WebSocket...')
 		
@@ -343,14 +362,14 @@ const App: React.FC = () => {
 			wsRef.current = null
 		}
 		
-		// 연결 체크 인터벌 정리
+		// Clean up connection check interval
 		if (connectionCheckInterval.current) {
 			console.log('Clearing connection check interval on manual disconnect')
 			clearInterval(connectionCheckInterval.current)
 			connectionCheckInterval.current = null
 		}
 		
-		// ping 인터벌 정리
+		// Clean up ping interval
 		if (pingInterval.current) {
 			console.log('Clearing ping interval on manual disconnect')
 			clearInterval(pingInterval.current)
@@ -358,14 +377,14 @@ const App: React.FC = () => {
 		}
 	}
 
-	// 외부 명령 실행
+	// Execute external command
 	const executeCommand = (commandData: any) => {
-		// WebSocket 서버에서 보낸 명령의 ID 사용
+		// Use command ID sent from WebSocket server
 		const commandId = commandData.id || `cmd_${commandIdCounter.current++}`
 		
-		console.log('🔧 명령 실행 시작:', { commandId, command: commandData.command, params: commandData.params });
+		console.log('🔧 Command execution started:', { commandId, command: commandData.command, params: commandData.params });
 		
-		// 명령 기록 추가
+		// Add command to history
 		const newCommand = {
 			id: commandId,
 			command: commandData.command,
@@ -376,7 +395,7 @@ const App: React.FC = () => {
 		
 		setCommandHistory(prev => [newCommand, ...prev].slice(0, 50))
 		
-		// 플러그인에 명령 전달
+		// Send command to plugin
 		window.parent.postMessage(
 			{
 				pluginMessage: {
@@ -391,10 +410,33 @@ const App: React.FC = () => {
 	}
 
 	// 명령 결과 처리
+	const copyToClipboard = async (text: string, id: string) => {
+		try {
+			// Figma 플러그인에서 클립보드 복사 처리
+			// 메인 스레드로 메시지 전송
+			parent.postMessage({
+				pluginMessage: {
+					type: 'copy-to-clipboard',
+					text: text
+				}
+			}, '*')
+			
+			// UI 상태 업데이트
+			setCopiedId(id)
+			
+			// 2초 후 상태 초기화
+			setTimeout(() => {
+				setCopiedId(null)
+			}, 2000)
+		} catch (err) {
+			console.error('Failed to copy:', err)
+		}
+	}
+
 	const handleCommandResult = (commandId: string, result: any) => {
-		console.log('✅ 명령 결과 처리:', { commandId, result });
+		console.log('✅ Command result processing:', { commandId, result });
 		
-		// 명령 기록 업데이트
+		// Update command history
 		setCommandHistory(prev => 
 			prev.map(cmd => 
 				cmd.id === commandId 
@@ -403,7 +445,7 @@ const App: React.FC = () => {
 			)
 		)
 		
-		// WebSocket으로 결과 전송 (WebSocketServer에서 기대하는 형식)
+		// Send result via WebSocket (format expected by WebSocketServer)
 		if (wsRef.current?.readyState === WebSocket.OPEN) {
 			const response = {
 				type: 'command_result',
@@ -411,16 +453,16 @@ const App: React.FC = () => {
 				result,
 				timestamp: new Date().toISOString()
 			};
-			console.log('📤 WebSocket으로 결과 전송:', response);
+			console.log('📤 Sending result via WebSocket:', response);
 			wsRef.current.send(JSON.stringify(response))
 		}
 	}
 
-	// 명령 에러 처리
+	// Handle command error
 	const handleCommandError = (commandId: string, error: string) => {
-		console.log('❌ 명령 에러 처리:', { commandId, error });
+		console.log('❌ Command error processing:', { commandId, error });
 		
-		// 명령 기록 업데이트
+		// Update command history
 		setCommandHistory(prev => 
 			prev.map(cmd => 
 				cmd.id === commandId 
@@ -429,7 +471,7 @@ const App: React.FC = () => {
 			)
 		)
 		
-		// WebSocket으로 에러 전송 (WebSocketServer에서 기대하는 형식)
+		// Send error via WebSocket (format expected by WebSocketServer)
 		if (wsRef.current?.readyState === WebSocket.OPEN) {
 			const response = {
 				type: 'command_error',
@@ -437,12 +479,12 @@ const App: React.FC = () => {
 				error,
 				timestamp: new Date().toISOString()
 			};
-			console.log('📤 WebSocket으로 에러 전송:', response);
+			console.log('📤 Sending error via WebSocket:', response);
 			wsRef.current.send(JSON.stringify(response))
 		}
 	}
 
-	// 설정 업데이트
+	// Update settings
 		const updateSettings = () => {
 		console.log('💾 Saving settings...', {
 			serverPort,
@@ -480,9 +522,18 @@ const App: React.FC = () => {
 
 
 	return (
-		<div className="container" role="main">
+		<div className="container" role="main" style={{ 
+			padding: '8px',
+			display: 'flex',
+			flexDirection: 'column',
+			height: '100%',
+			overflow: 'hidden'
+		}}>
 			{/* Application Header with proper semantics */}
-			<header className="banner" role="banner">
+			<header className="banner" role="banner" style={{ 
+				marginBottom: '8px',
+				flexShrink: 0
+			}}>
 				<Icon size={38} />
 				<h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>Figmation</h1>
 			</header>
@@ -491,7 +542,12 @@ const App: React.FC = () => {
 			<nav 
 				role="tablist" 
 				aria-label="Plugin navigation tabs"
-				style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '16px' }}
+				style={{ 
+					display: 'flex', 
+					borderBottom: '1px solid #ddd', 
+					marginBottom: '8px',
+					flexShrink: 0
+				}}
 			>
 				{['connection', 'channels', 'selection'].map((tab, index) => (
 					<button
@@ -523,7 +579,7 @@ const App: React.FC = () => {
 						}}
 						style={{
 							flex: 1,
-							padding: '12px 8px',
+							padding: '8px 4px',
 							border: 'none',
 							background: activeTab === tab ? '#007AFF' : 'transparent',
 							color: activeTab === tab ? 'white' : '#333',
@@ -551,9 +607,16 @@ const App: React.FC = () => {
 				))}
 			</nav>
 
-			{/* Connection Tab Panel */}
-			{activeTab === 'connection' && (
-				<section 
+			{/* Scrollable content area */}
+			<div style={{
+				flex: 1,
+				overflowY: 'auto',
+				overflowX: 'hidden',
+				minHeight: 0
+			}}>
+				{/* Connection Tab Panel */}
+				{activeTab === 'connection' && (
+					<section 
 					role="tabpanel" 
 					id="panel-connection"
 					aria-labelledby="tab-connection"
@@ -572,15 +635,15 @@ const App: React.FC = () => {
 							</legend>
 
 							<div className="field">
-								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
 									<label htmlFor="server-port" style={{ 
 										display: 'flex', 
 										alignItems: 'center', 
 										gap: '4px',
-										width: '80px',
+										width: '70px',
 										flexShrink: 0,
-										paddingLeft: '8px',
-										paddingRight: '8px'
+										paddingLeft: '4px',
+										paddingRight: '4px'
 									}}>
 										Port:
 										<Tooltip text="Port number between 1 and 65535 (default: 3055)" />
@@ -615,15 +678,15 @@ const App: React.FC = () => {
 
 							{/* Channel Configuration - moved up */}
 							<div className="field">
-								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+								<div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
 									<label htmlFor="channel-id" style={{ 
 										display: 'flex', 
 										alignItems: 'center', 
 										gap: '4px',
-										width: '80px',
+										width: '70px',
 										flexShrink: 0,
-										paddingLeft: '8px',
-										paddingRight: '8px'
+										paddingLeft: '4px',
+										paddingRight: '4px'
 									}}>
 										Channel:
 										<Tooltip text="Unique identifier for your design project channel" />
@@ -652,7 +715,7 @@ const App: React.FC = () => {
 					</form>
 
 					{/* Connection Status with proper ARIA live region */}
-					<div className="field" role="status" aria-live="polite" aria-atomic="true">
+					<div className="field" role="status" aria-live="polite" aria-atomic="true" style={{ marginBottom: '8px' }}>
 						<strong id="connection-status-label">Connection Status: </strong>
 						<span 
 							style={{ 
@@ -698,7 +761,7 @@ const App: React.FC = () => {
 
 					{/* Setup Instructions with proper semantics */}
 					<section 
-						style={{ fontSize: '12px', marginTop: '16px' }}
+						style={{ fontSize: '12px', marginTop: '8px' }}
 						aria-labelledby="setup-instructions-heading"
 					>
 						<button 
@@ -707,13 +770,13 @@ const App: React.FC = () => {
 							style={{ 
 								fontSize: '14px', 
 								fontWeight: 'bold', 
-								margin: '0 0 8px 0',
+								margin: '0 0 4px 0',
 								background: 'none',
 								border: 'none',
 								cursor: 'pointer',
 								display: 'flex',
 								alignItems: 'center',
-								gap: '6px',
+								gap: '4px',
 								padding: '0',
 								color: 'inherit'
 							}}
@@ -733,7 +796,7 @@ const App: React.FC = () => {
 									<li>Install <strong>n8n-nodes-figmation</strong> from n8n Community Nodes</li>
 									<li>Create n8n workflow with <strong>Figmation Connector</strong> node</li>
 									<li>Choose <strong>Connection Type</strong>:
-										<ul style={{ marginTop: '8px', marginBottom: '8px' }}>
+										<ul style={{ marginTop: '4px', marginBottom: '4px' }}>
 											<li><strong>Standalone</strong>: Set <code>WebSocket Host</code> to <code>0.0.0.0</code> for external access</li>
 											<li><strong>Integrated</strong>: Use n8n HTTP server with WebSocket path (e.g., <code>/ws</code>)</li>
 										</ul>
@@ -747,9 +810,9 @@ const App: React.FC = () => {
 								</ol>
 								<div 
 									style={{ 
-										marginTop: '8px', 
-										marginBottom: '16px',
-										padding: '8px', 
+										marginTop: '6px', 
+										marginBottom: '8px',
+										padding: '6px', 
 										background: '#f0f8ff', 
 										borderRadius: '4px',
 										border: '1px solid #cce7ff'
@@ -801,84 +864,24 @@ const App: React.FC = () => {
 							}}>
 								{currentChannel.clientId}
 							</code>
+							{currentChannel.clientId && (
+								<button
+									onClick={() => copyToClipboard(currentChannel.clientId, 'client-id')}
+									style={{
+										background: copiedId === 'client-id' ? '#4CAF50' : '',
+										cursor: 'pointer',
+										fontSize: '10px',
+										transition: 'all 0.2s'
+									}}
+									title="Copy ID"
+								>
+									{copiedId === 'client-id' ? '✓' : '📋'}
+								</button>
+							)}
 						</div>
 					)}
 
 					{/* Channel List Section */}
-					<section aria-labelledby="channel-list-heading">
-						<h3 
-							id="channel-list-heading"
-							style={{ 
-								fontSize: '14px', 
-								fontWeight: 'bold', 
-								margin: '16px 0 8px 0' 
-							}}
-						>
-							Active Channels ({channelList.length})
-						</h3>
-
-						{channelList.length > 0 ? (
-							<div 
-								style={{ maxHeight: '300px', overflowY: 'auto' }}
-								role="list"
-								aria-label={`${channelList.length} active channels`}
-							>
-								{channelList.map((channel) => (
-									<div 
-										key={channel.id}
-										role="listitem"
-										style={{ 
-											border: '1px solid #ddd', 
-											padding: '8px', 
-											margin: '4px 0',
-											borderRadius: '4px',
-											fontSize: '12px',
-											backgroundColor: channel.id === currentChannel?.id ? '#e8f5e8' : 'transparent'
-										}}
-										aria-current={channel.id === currentChannel?.id ? 'true' : 'false'}
-									>
-										<div>
-											<strong>Channel:</strong> 
-											<span style={{ marginLeft: '4px' }}>{channel.id}</span>
-										</div>
-										<div>
-											<strong>Clients:</strong> 
-											<span style={{ marginLeft: '4px' }}>{channel.clients.length}</span>
-										</div>
-										{channel.clients.length > 0 && (
-											<div 
-												style={{ marginLeft: '10px', fontSize: '11px', marginTop: '4px' }}
-												role="list"
-												aria-label={`${channel.clients.length} clients in channel ${channel.id}`}
-											>
-												{channel.clients.map((client: any, index: number) => (
-													<div key={index} role="listitem">
-														• {client.type} ({client.id})
-													</div>
-												))}
-											</div>
-										)}
-									</div>
-								))}
-							</div>
-						) : (
-							<div 
-								style={{ 
-									textAlign: 'center', 
-									color: '#666', 
-									fontStyle: 'italic',
-									padding: '20px',
-									border: '1px dashed #ddd',
-									borderRadius: '4px',
-									background: '#f9f9f9'
-								}}
-								role="status"
-								aria-label="No active channels available"
-							>
-								No active channels
-							</div>
-						)}
-					</section>
 				</section>
 			)}
 
@@ -911,14 +914,13 @@ const App: React.FC = () => {
 								style={{ 
 									fontSize: '14px', 
 									fontWeight: 'bold', 
-									margin: '16px 0 8px 0' 
+									margin: '8px 0 4px 0' 
 								}}
 							>
 								Selected Nodes ({selectionInfo.length})
 							</h3>
 							
 							<div 
-								style={{ maxHeight: '300px', overflowY: 'auto' }}
 								role="list"
 								aria-label={`${selectionInfo.length} selected nodes`}
 							>
@@ -928,34 +930,521 @@ const App: React.FC = () => {
 										role="listitem" 
 										style={{ 
 											border: '1px solid #ddd', 
-											padding: '8px', 
-											margin: '4px 0',
+											padding: '12px', 
+											margin: '8px 0',
 											borderRadius: '4px',
-											fontSize: '12px'
+											fontSize: '12px',
+											backgroundColor: '#fafafa',
+											wordWrap: 'break-word',
+											overflowWrap: 'break-word'
 										}}
 										aria-label={`Selected node: ${node.name}, type: ${node.type}`}
 									>
-										<div>
-											<strong>Name:</strong> 
-											<span style={{ marginLeft: '4px' }}>{node.name}</span>
-										</div>
-										<div>
-											<strong>Type:</strong> 
-											<span style={{ marginLeft: '4px' }}>{node.type}</span>
-										</div>
-										<div>
-											<strong>ID:</strong> 
-											<code style={{ 
-												fontFamily: 'monospace', 
-												fontSize: '11px',
-												background: '#f5f5f5',
-												padding: '2px 4px',
-												borderRadius: '2px',
-												marginLeft: '4px'
+										{/* Basic Properties Section */}
+										<div style={{ 
+											marginBottom: '12px',
+											padding: '8px',
+											background: '#f8f9fa',
+											borderRadius: '4px',
+											border: '1px solid #e9ecef'
+										}}>
+											<h4 style={{ 
+												margin: '0 0 8px 0', 
+												fontSize: '13px', 
+												fontWeight: 'bold', 
+												color: '#495057' 
 											}}>
-												{node.id}
-											</code>
+												Basic Properties
+											</h4>
+											<div style={{ marginBottom: '4px' }}>
+												<strong>Name:</strong> 
+												<span style={{ marginLeft: '4px', fontWeight: 'bold', wordBreak: 'break-word' }}>{node.name}</span>
+											</div>
+											<div style={{ marginBottom: '4px' }}>
+												<strong>Type:</strong> 
+												<span style={{ 
+													marginLeft: '4px',
+													background: '#e3f2fd',
+													padding: '2px 6px',
+													borderRadius: '3px',
+													fontSize: '11px',
+													fontWeight: 'bold'
+												}}>
+													{node.type}
+												</span>
+											</div>
+											<div style={{ marginBottom: '4px' }}>
+												<strong>ID:</strong> 
+												<code style={{ 
+													fontFamily: 'monospace', 
+													fontSize: '11px',
+													background: '#f5f5f5',
+													padding: '2px 4px',
+													borderRadius: '2px',
+													marginLeft: '4px',
+													wordBreak: 'break-all',
+													display: 'inline-block',
+													maxWidth: 'calc(100% - 80px)'
+												}}>
+													{node.id}
+												</code>
+												<button
+													onClick={() => copyToClipboard(node.id, `node-${node.id}`)}
+													style={{
+														background: copiedId === `node-${node.id}` ? '#4CAF50' : '',
+														cursor: 'pointer',
+														fontSize: '10px',
+														transition: 'all 0.2s'
+													}}
+													title="Copy ID"
+												>
+													{copiedId === `node-${node.id}` ? '✓' : '📋'}
+												</button>
+											</div>
+											<div style={{ marginBottom: '4px' }}>
+												<strong>Position:</strong> 
+												<span style={{ marginLeft: '4px' }}>x: {node.x}, y: {node.y}</span>
+											</div>
+											<div style={{ marginBottom: '4px' }}>
+												<strong>Size:</strong> 
+												<span style={{ marginLeft: '4px' }}>{node.width} × {node.height}</span>
+											</div>
+											<div style={{ marginBottom: '4px' }}>
+												<strong>Visible:</strong> 
+												<span style={{ marginLeft: '4px' }}>{node.visible ? '✓' : '✗'}</span>
+												<span style={{ marginLeft: '12px' }}>
+													<strong>Locked:</strong> 
+													<span style={{ marginLeft: '4px' }}>{node.locked ? '✓' : '✗'}</span>
+												</span>
+											</div>
+											{node.opacity !== undefined && node.opacity < 1 && (
+												<div style={{ marginBottom: '4px' }}>
+													<strong>Opacity:</strong> 
+													<span style={{ marginLeft: '4px' }}>{(node.opacity * 100).toFixed(0)}%</span>
+												</div>
+											)}
+											{node.blendMode && node.blendMode !== 'NORMAL' && (
+												<div>
+													<strong>Blend Mode:</strong> 
+													<span style={{ marginLeft: '4px' }}>{node.blendMode}</span>
+												</div>
+											)}
 										</div>
+
+										{/* Component Properties */}
+										{(node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') && (
+											<div style={{ 
+												marginBottom: '12px',
+												padding: '8px',
+												background: '#e3f2fd',
+												borderRadius: '4px',
+												border: '1px solid #bbdefb'
+											}}>
+												<h4 style={{ 
+													margin: '0 0 8px 0', 
+													fontSize: '13px', 
+													fontWeight: 'bold', 
+													color: '#1976d2' 
+												}}>
+													Component Properties
+												</h4>
+												{node.key && (
+													<div style={{ marginBottom: '8px' }}>
+														<strong>Key:</strong> 
+														<code style={{ 
+															marginLeft: '4px',
+															fontSize: '11px',
+															background: '#e8f5e9',
+															padding: '2px 4px',
+															borderRadius: '2px'
+														}}>
+															{node.key}
+														</code>
+														<button
+															onClick={() => copyToClipboard(node.key, `node-key-${node.id}`)}
+															style={{
+																background: copiedId === `node-key-${node.id}` ? '#4CAF50' : '',
+																cursor: 'pointer',
+																fontSize: '10px',
+																transition: 'all 0.2s'
+															}}
+															title="Copy Key"
+														>
+															{copiedId === `node-key-${node.id}` ? '✓' : '📋'}
+														</button>
+													</div>
+												)}
+												{node.description && (
+													<div style={{ marginBottom: '8px' }}>
+														<strong>Description:</strong> 
+														<span style={{ marginLeft: '4px', fontStyle: 'italic', wordBreak: 'break-word', display: 'inline-block' }}>{node.description}</span>
+													</div>
+												)}
+												{node.componentProperties && node.componentProperties.length > 0 && (
+													<div style={{ marginBottom: '8px' }}>
+														<strong>Properties:</strong>
+														<ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+															{node.componentProperties.map((prop: any, idx: number) => (
+																<li key={idx} style={{ marginBottom: '2px' }}>
+																	<code>{prop.key}</code>: {prop.type}
+																	{prop.defaultValue && ` = "${prop.defaultValue}"`}
+																	{prop.variantOptions && ` [${prop.variantOptions.join(', ')}]`}
+																</li>
+															))}
+														</ul>
+													</div>
+												)}
+												{node.variantGroupProperties && Object.keys(node.variantGroupProperties).length > 0 && (
+													<div style={{ marginBottom: '8px' }}>
+														<strong>Variant Groups:</strong>
+														<ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+															{Object.entries(node.variantGroupProperties).map(([key, value]: [string, any], idx: number) => {
+																// Variant Group Properties 형식에 따른 처리
+																let displayValue = '';
+																if (Array.isArray(value)) {
+																	displayValue = `[${value.join(', ')}]`;
+																} else if (value && typeof value === 'object' && value.values) {
+																	displayValue = `[${value.values.join(', ')}]`;
+																} else if (value && typeof value === 'object') {
+																	// 객체인 경우 키들을 표시
+																	displayValue = `[${Object.keys(value).join(', ')}]`;
+																} else {
+																	displayValue = String(value);
+																}
+																
+																return (
+																	<li key={idx} style={{ marginBottom: '2px' }}>
+																		<code>{key}</code>: {displayValue}
+																	</li>
+																);
+															})}
+														</ul>
+													</div>
+												)}
+											</div>
+										)}
+
+										{/* Instance Properties */}
+										{node.type === 'INSTANCE' && (
+											<div style={{ 
+												marginBottom: '12px',
+												padding: '8px',
+												background: '#fff',
+												borderRadius: '4px',
+												border: '1px solid #dee2e6'
+											}}>
+												<h4 style={{ 
+													margin: '0 0 8px 0', 
+													fontSize: '13px', 
+													fontWeight: 'bold', 
+													color: '#388e3c' 
+												}}>
+													Instance Properties
+												</h4>
+												{node.mainComponent && (
+													<div style={{ marginBottom: '8px' }}>
+														<h5 style={{ 
+															margin: '0 0 4px 0', 
+															fontSize: '12px', 
+															fontWeight: 'bold', 
+															color: '#2e7d32' 
+														}}>
+															Main Component
+														</h5>
+														<div style={{ 
+															marginTop: '4px',
+															padding: '6px',
+															background: '#e8f5e9',
+															borderRadius: '4px',
+															fontSize: '12px'
+														}}>
+															<div style={{ marginBottom: '4px' }}>
+																<strong>Name:</strong> 
+																<span style={{ marginLeft: '4px' }}>{node.mainComponent.name || '(unnamed)'}</span>
+															</div>
+															{node.mainComponent.key && (
+																<div style={{ 
+																	display: 'flex', 
+																	alignItems: 'center'
+																}}>
+																	<strong style={{ marginRight: '8px' }}>Key:</strong>
+																	<code style={{ 
+																		background: '#e6ee9c',
+																		padding: '2px 6px',
+																		borderRadius: '3px',
+																		fontWeight: 'bold',
+																		fontSize: '11px',
+																		wordBreak: 'break-all',
+																		flex: 1
+																	}}>
+																		{node.mainComponent.key}
+																	</code>
+																	<button
+																		type="button"
+																		onClick={() => copyToClipboard(node.mainComponent.key, `component-key-${node.id}`)}
+																		style={{
+																			marginLeft: '4px',
+																			padding: '1px 3px',
+																			fontSize: '10px',
+																			cursor: 'pointer'
+																		}}
+																		title="Copy Key"
+																	>
+																		{copiedId === `component-key-${node.id}` ? '✓' : '📋'}
+																	</button>
+																</div>
+															)}
+														</div>
+													</div>
+												)}
+												{node.availableProperties && node.availableProperties.length > 0 && (
+													<div style={{ marginBottom: '8px' }}>
+														<h5 style={{ 
+															margin: '0 0 4px 0', 
+															fontSize: '12px', 
+															fontWeight: 'bold', 
+															color: '#1976d2' 
+														}}>
+															Available Properties
+														</h5>
+														<div style={{ marginTop: '4px' }}>
+															{node.availableProperties.map((prop: any, idx: number) => (
+																<div key={idx} style={{ 
+																	marginBottom: '6px',
+																	padding: '6px',
+																	background: '#f5f5f5',
+																	borderRadius: '4px',
+																	fontSize: '12px'
+																}}>
+																	<div style={{ 
+																		display: 'flex', 
+																		alignItems: 'center',
+																		marginBottom: '4px'
+																	}}>
+																		<code style={{ 
+																			background: '#e3f2fd',
+																			padding: '2px 6px',
+																			borderRadius: '3px',
+																			fontWeight: 'bold',
+																			fontSize: '11px',
+																			flex: 1
+																		}}>{prop.key}</code>
+																		<button
+																			type="button"
+																			onClick={() => copyToClipboard(prop.key, `prop-${node.id}-${idx}`)}
+																			style={{
+																				padding: '1px 3px',
+																				fontSize: '10px',
+																				cursor: 'pointer'
+																			}}
+																			title="Copy property name"
+																		>
+																			{copiedId === `prop-${node.id}-${idx}` ? '✓' : '📋'}
+																		</button>
+																	</div>
+																	<div style={{ 
+																		display: 'flex',
+																		justifyContent: 'space-between',
+																		fontSize: '11px',
+																		color: '#666'
+																	}}>
+																		<span>Type: <strong>{prop.type}</strong></span>
+																		{prop.currentValue !== undefined && (
+																			<span>Value: <strong>
+																				{(() => {
+																					if (typeof prop.currentValue === 'object' && prop.currentValue !== null) {
+																						if (prop.currentValue.type === 'TEXT' && prop.currentValue.value) {
+																							return prop.currentValue.value;
+																						} else if (prop.currentValue.type === 'VARIANT' && prop.currentValue.value) {
+																							return prop.currentValue.value;
+																						} else if (prop.currentValue.value !== undefined) {
+																							return String(prop.currentValue.value);
+																						}
+																						return JSON.stringify(prop.currentValue);
+																					}
+																					return String(prop.currentValue);
+																				})()}
+																			</strong></span>
+																		)}
+																	</div>
+																</div>
+															))}
+														</div>
+													</div>
+												)}
+												{node.exposedInstances && node.exposedInstances.length > 0 && (
+													<div style={{ marginBottom: '8px' }}>
+														<strong>Exposed Instances:</strong>
+														<ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+															{node.exposedInstances.map((exp: any, idx: number) => (
+																<li key={idx} style={{ marginBottom: '2px' }}>
+																	{exp.name} ({exp.type})
+																</li>
+															))}
+														</ul>
+													</div>
+												)}
+											</div>
+										)}
+
+										{/* Text Properties */}
+										{node.type === 'TEXT' && (
+											<div style={{ 
+												marginBottom: '12px',
+												padding: '8px',
+												background: '#fff8e1',
+												borderRadius: '4px',
+												border: '1px solid #ffecb3'
+											}}>
+												<h4 style={{ 
+													margin: '0 0 8px 0', 
+													fontSize: '13px', 
+													fontWeight: 'bold', 
+													color: '#e65100' 
+												}}>
+													Text Properties
+												</h4>
+												<div>
+													<div style={{ marginBottom: '4px' }}>
+														<strong>Characters:</strong> 
+														<span style={{ 
+															marginLeft: '4px',
+															fontStyle: 'italic',
+															maxWidth: '200px',
+															display: 'inline-block',
+															whiteSpace: 'nowrap',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															verticalAlign: 'bottom'
+														}}>
+															"{node.characters}"
+														</span>
+													</div>
+													{node.fontSize && (
+														<div style={{ marginBottom: '4px' }}>
+															<strong>Font Size:</strong> 
+															<span style={{ marginLeft: '4px' }}>{node.fontSize}px</span>
+														</div>
+													)}
+													{node.fontName && (
+														<div style={{ marginBottom: '4px' }}>
+															<strong>Font:</strong> 
+															<span style={{ marginLeft: '4px' }}>{node.fontName.family} {node.fontName.style}</span>
+														</div>
+													)}
+													<div style={{ marginBottom: '4px' }}>
+														<strong>Alignment:</strong> 
+														<span style={{ marginLeft: '4px' }}>{node.textAlignHorizontal} / {node.textAlignVertical}</span>
+													</div>
+												</div>
+											</div>
+										)}
+
+										{/* Layout Properties */}
+										{node.layoutMode && node.layoutMode !== 'NONE' && (
+											<div style={{ 
+												marginBottom: '12px',
+												padding: '8px',
+												background: '#e8f5e9',
+												borderRadius: '4px',
+												border: '1px solid #c8e6c9'
+											}}>
+												<h4 style={{ 
+													margin: '0 0 8px 0', 
+													fontSize: '13px', 
+													fontWeight: 'bold', 
+													color: '#2e7d32' 
+												}}>
+													Layout Properties
+												</h4>
+												<div>
+													<div style={{ marginBottom: '4px' }}>
+														<strong>Layout Mode:</strong> 
+														<span style={{ marginLeft: '4px' }}>{node.layoutMode}</span>
+														{node.layoutDirection && ` (${node.layoutDirection})`}
+													</div>
+													<div style={{ marginBottom: '4px' }}>
+														<strong>Spacing:</strong> 
+														<span style={{ marginLeft: '4px' }}>{node.itemSpacing}px</span>
+													</div>
+													<div style={{ marginBottom: '4px' }}>
+														<strong>Padding:</strong> 
+														<span style={{ marginLeft: '4px' }}>
+															{node.paddingTop}/{node.paddingRight}/{node.paddingBottom}/{node.paddingLeft}
+														</span>
+													</div>
+												</div>
+											</div>
+										)}
+
+										{/* Style Properties */}
+										{(node.fillsCount > 0 || node.strokesCount > 0 || node.effectsCount > 0) && (
+											<div style={{ 
+												marginBottom: '12px',
+												padding: '8px',
+												background: '#f3e5f5',
+												borderRadius: '4px',
+												border: '1px solid #e1bee7'
+											}}>
+												<h4 style={{ 
+													margin: '0 0 8px 0', 
+													fontSize: '13px', 
+													fontWeight: 'bold', 
+													color: '#7b1fa2' 
+												}}>
+													Style Properties
+												</h4>
+												<div>
+													{node.fillsCount > 0 && (
+														<div style={{ marginBottom: '4px' }}>
+															<strong>Fills:</strong> 
+															<span style={{ marginLeft: '4px' }}>{node.fillsCount} fill(s)</span>
+														</div>
+													)}
+													{node.strokesCount > 0 && (
+														<div style={{ marginBottom: '4px' }}>
+															<strong>Strokes:</strong> 
+															<span style={{ marginLeft: '4px' }}>{node.strokesCount} stroke(s)</span>
+															{node.strokeWeight && ` (${node.strokeWeight}px)`}
+														</div>
+													)}
+													{node.effectsCount > 0 && (
+														<div style={{ marginBottom: '4px' }}>
+															<strong>Effects:</strong> 
+															<span style={{ marginLeft: '4px' }}>{node.effectsCount} effect(s)</span>
+															{node.effectTypes && (
+																<span style={{ marginLeft: '8px', fontSize: '11px', color: '#666' }}>
+																	[{node.effectTypes.join(', ')}]
+																</span>
+															)}
+														</div>
+													)}
+												</div>
+											</div>
+										)}
+
+										{/* Constraints */}
+										{node.constraints && (
+											<div style={{ 
+												marginBottom: '12px',
+												padding: '8px',
+												background: '#fff3e0',
+												borderRadius: '4px',
+												border: '1px solid #ffcc02'
+											}}>
+												<h4 style={{ 
+													margin: '0 0 8px 0', 
+													fontSize: '13px', 
+													fontWeight: 'bold', 
+													color: '#ff8f00' 
+												}}>
+													Constraints
+												</h4>
+												<div>
+													<span>H: {node.constraints.horizontal}, V: {node.constraints.vertical}</span>
+												</div>
+											</div>
+										)}
 									</div>
 								))}
 							</div>
@@ -1204,6 +1693,7 @@ const App: React.FC = () => {
 					)}
 				</section>
 			)}
+			</div>
 		</div>
 	)
 }

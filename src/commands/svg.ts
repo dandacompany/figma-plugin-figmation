@@ -13,7 +13,7 @@ export async function createDesignFromSvg(params: CommandParams): Promise<Comman
   const name = params?.name || params?.Name || 'Design'
   const parentId = params?.parentId || params?.Parent_Node_ID || params?.parentIdForNode
 
-  // Design 모드 체크
+  // Check Design mode
   if (figma.editorType !== 'figma') {
     throw new Error('Node creation is only available in Design mode')
   }
