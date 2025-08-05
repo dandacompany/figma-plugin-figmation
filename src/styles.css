@@ -6,7 +6,7 @@
 
 html {
 	background-color: var(--figma-color-bg);
-	color: var(--figma-color-text);
+	color: #000000;
 }
 
 body {

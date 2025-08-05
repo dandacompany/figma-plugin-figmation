@@ -7,9 +7,11 @@ interface InputProps {
   showIcon?: boolean;
   placeholder?: string;
   onChange?: (value: string) => void;
+  style?: React.CSSProperties;
+  id?: string;
 }
 
-const Input: React.FC<InputProps> = ({ value = '', type = 'text', showIcon = false, placeholder, onChange }) => {
+const Input: React.FC<InputProps> = ({ value = '', type = 'text', showIcon = false, placeholder, onChange, style, id }) => {
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {
       onChange(event.target.value);
@@ -38,6 +40,8 @@ const Input: React.FC<InputProps> = ({ value = '', type = 'text', showIcon = fal
             placeholder={placeholder}
             spellCheck={false}
             dir="auto"
+            style={style}
+            id={id}
           />
         </label>
       </div>

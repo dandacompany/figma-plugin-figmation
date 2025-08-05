@@ -527,7 +527,9 @@ const App: React.FC = () => {
 			display: 'flex',
 			flexDirection: 'column',
 			height: '100%',
-			overflow: 'hidden'
+			overflow: 'hidden',
+			backgroundColor: 'white',
+			borderRadius: '8px'
 		}}>
 			{/* Application Header with proper semantics */}
 			<header className="banner" role="banner" style={{ 
@@ -580,16 +582,16 @@ const App: React.FC = () => {
 						style={{
 							flex: 1,
 							padding: '8px 4px',
-							border: 'none',
-							background: activeTab === tab ? '#007AFF' : 'transparent',
-							color: activeTab === tab ? 'white' : '#333',
-							cursor: 'pointer',
 							textTransform: 'capitalize',
 							fontSize: '14px',
 							fontWeight: activeTab === tab ? 'bold' : 'normal',
+							backgroundColor: activeTab === tab ? 'rgba(255, 165, 0, 0.2)' : 'transparent',
+							borderBottom: activeTab === tab ? '2px solid rgb(255, 165, 0)' : '2px solid transparent',
+							color: activeTab === tab ? '#000000' : '#666666',
 							// Enhanced focus styles for accessibility
 							outline: 'none',
-							position: 'relative'
+							position: 'relative',
+							transition: 'all 0.2s ease'
 						}}
 						className={`tab-button ${activeTab === tab ? 'tab-active' : ''}`}
 					>
@@ -597,10 +599,7 @@ const App: React.FC = () => {
 						{/* Visual focus indicator */}
 						<style jsx>{`
 							.tab-button:focus {
-								box-shadow: inset 0 0 0 2px #005bb5;
-							}
-							.tab-button:hover {
-								background-color: ${activeTab === tab ? '#005bb5' : '#f0f0f0'};
+								box-shadow: inset 0 0 0 2px var(--brand);
 							}
 						`}</style>
 					</button>
@@ -643,7 +642,9 @@ const App: React.FC = () => {
 										width: '70px',
 										flexShrink: 0,
 										paddingLeft: '4px',
-										paddingRight: '4px'
+										paddingRight: '4px',
+										backgroundColor: 'rgba(255, 165, 0, 0.1)',
+										borderRadius: '4px'
 									}}>
 										Port:
 										<Tooltip text="Port number between 1 and 65535 (default: 3055)" />
@@ -652,6 +653,7 @@ const App: React.FC = () => {
 										id="server-port"
 										type="number"
 										value={serverPort.toString()}
+										style={{ backgroundColor: 'rgba(255, 165, 0, 0.1)', flex: 1 }}
 										onChange={(value: string) => {
 											try {
 												if (value === '') {
@@ -671,7 +673,6 @@ const App: React.FC = () => {
 										aria-required="true"
 										min="1"
 										max="65535"
-										style={{ flex: 1 }}
 									/>
 								</div>
 							</div>
@@ -686,7 +687,9 @@ const App: React.FC = () => {
 										width: '70px',
 										flexShrink: 0,
 										paddingLeft: '4px',
-										paddingRight: '4px'
+										paddingRight: '4px',
+										backgroundColor: 'rgba(255, 165, 0, 0.1)',
+										borderRadius: '4px'
 									}}>
 										Channel:
 										<Tooltip text="Unique identifier for your design project channel" />
@@ -695,6 +698,7 @@ const App: React.FC = () => {
 										id="channel-id"
 										type="text"
 										value={channelId}
+										style={{ backgroundColor: 'rgba(255, 165, 0, 0.1)', flex: 1 }}
 										onChange={(value: string) => {
 											try {
 												setChannelId(value);
@@ -706,7 +710,6 @@ const App: React.FC = () => {
 										placeholder="Enter channel ID"
 										aria-describedby="channel-id-help"
 										aria-required="false"
-										style={{ flex: 1 }}
 									/>
 								</div>
 							</div>
@@ -734,6 +737,10 @@ const App: React.FC = () => {
 							onClick={updateSettings}
 							aria-describedby="save-settings-help"
 							type="submit"
+							style={{
+								backgroundColor: 'rgba(255, 165, 0)',
+								borderRadius: '4px'
+							}}
 						>
 							Save
 						</Button>
@@ -744,7 +751,9 @@ const App: React.FC = () => {
 								aria-describedby="connect-button-help"
 								style={{
 									opacity: 1,
-									cursor: 'pointer'
+									cursor: 'pointer',
+									backgroundColor: 'rgba(255, 165, 0)',
+									borderRadius: '4px'
 								}}
 							>
 								Connect
@@ -753,6 +762,10 @@ const App: React.FC = () => {
 							<Button 
 								onClick={disconnectWebSocket}
 								aria-describedby="disconnect-button-help"
+								style={{
+									backgroundColor: 'rgba(255, 165, 0)',
+									borderRadius: '4px'
+								}}
 							>
 								Disconnect
 							</Button>
@@ -815,7 +828,7 @@ const App: React.FC = () => {
 										padding: '6px', 
 										background: '#f0f8ff', 
 										borderRadius: '4px',
-										border: '1px solid #cce7ff'
+										border: '1px solid #ddd'
 									}}
 									role="note"
 									aria-label="Important note about server configuration"
@@ -855,13 +868,7 @@ const App: React.FC = () => {
 					{currentChannel && (
 						<div className="field">
 							<strong>Client ID: </strong>
-							<code style={{ 
-								fontFamily: 'monospace', 
-								fontSize: '12px',
-								background: '#f5f5f5',
-								padding: '2px 4px',
-								borderRadius: '2px'
-							}}>
+							<code style={{ fontSize: '12px' }}>
 								{currentChannel.clientId}
 							</code>
 							{currentChannel.clientId && (
@@ -934,7 +941,7 @@ const App: React.FC = () => {
 											margin: '8px 0',
 											borderRadius: '4px',
 											fontSize: '12px',
-											backgroundColor: '#fafafa',
+											backgroundColor: '#f0f8ff',
 											wordWrap: 'break-word',
 											overflowWrap: 'break-word'
 										}}
@@ -942,17 +949,17 @@ const App: React.FC = () => {
 									>
 										{/* Basic Properties Section */}
 										<div style={{ 
-											marginBottom: '12px',
-											padding: '8px',
-											background: '#f8f9fa',
-											borderRadius: '4px',
-											border: '1px solid #e9ecef'
+											backgroundColor: '#e3f2fd', 
+											border: '1px solid #bbdefb', 
+											borderRadius: '4px', 
+											padding: '8px', 
+											marginBottom: '12px' 
 										}}>
 											<h4 style={{ 
 												margin: '0 0 8px 0', 
 												fontSize: '13px', 
-												fontWeight: 'bold', 
-												color: '#495057' 
+												fontWeight: 'bold',
+												color: '#1976d2' 
 											}}>
 												Basic Properties
 											</h4>
@@ -964,7 +971,7 @@ const App: React.FC = () => {
 												<strong>Type:</strong> 
 												<span style={{ 
 													marginLeft: '4px',
-													background: '#e3f2fd',
+													background: 'var(--bg-selected)',
 													padding: '2px 6px',
 													borderRadius: '3px',
 													fontSize: '11px',
@@ -978,7 +985,7 @@ const App: React.FC = () => {
 												<code style={{ 
 													fontFamily: 'monospace', 
 													fontSize: '11px',
-													background: '#f5f5f5',
+													background: 'var(--code-bg)',
 													padding: '2px 4px',
 													borderRadius: '2px',
 													marginLeft: '4px',
@@ -1034,11 +1041,11 @@ const App: React.FC = () => {
 										{/* Component Properties */}
 										{(node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') && (
 											<div style={{ 
-												marginBottom: '12px',
-												padding: '8px',
-												background: '#e3f2fd',
-												borderRadius: '4px',
-												border: '1px solid #bbdefb'
+												backgroundColor: '#e3f2fd', 
+												border: '1px solid #bbdefb', 
+												borderRadius: '4px', 
+												padding: '8px', 
+												marginBottom: '12px' 
 											}}>
 												<h4 style={{ 
 													margin: '0 0 8px 0', 
@@ -1127,17 +1134,17 @@ const App: React.FC = () => {
 										{/* Instance Properties */}
 										{node.type === 'INSTANCE' && (
 											<div style={{ 
-												marginBottom: '12px',
-												padding: '8px',
-												background: '#fff',
-												borderRadius: '4px',
-												border: '1px solid #dee2e6'
+												backgroundColor: '#e8f5e9', 
+												border: '1px solid #c8e6c9', 
+												borderRadius: '4px', 
+												padding: '8px', 
+												marginBottom: '12px' 
 											}}>
 												<h4 style={{ 
 													margin: '0 0 8px 0', 
 													fontSize: '13px', 
 													fontWeight: 'bold', 
-													color: '#388e3c' 
+													color: '#2e7d32' 
 												}}>
 													Instance Properties
 												</h4>
@@ -1212,7 +1219,7 @@ const App: React.FC = () => {
 																<div key={idx} style={{ 
 																	marginBottom: '6px',
 																	padding: '6px',
-																	background: '#f5f5f5',
+																	background: 'var(--code-bg)',
 																	borderRadius: '4px',
 																	fontSize: '12px'
 																}}>
@@ -1222,7 +1229,7 @@ const App: React.FC = () => {
 																		marginBottom: '4px'
 																	}}>
 																		<code style={{ 
-																			background: '#e3f2fd',
+																			background: 'var(--bg-selected)',
 																			padding: '2px 6px',
 																			borderRadius: '3px',
 																			fontWeight: 'bold',
@@ -1567,7 +1574,7 @@ const App: React.FC = () => {
 												</summary>
 												<pre 
 													style={{ 
-														background: '#f5f5f5', 
+														background: 'var(--code-bg)', 
 														padding: '8px',
 														fontSize: '10px',
 														whiteSpace: 'pre-wrap',
