@@ -16,7 +16,7 @@ export function generateNodeName(baseType: string, customName?: string | null): 
 
 // Append node to parent
 export async function appendToParent(node: SceneNode, parentId?: string | null): Promise<string | null> {
-  if (parentId) {
+  if (parentId && parentId.trim() !== '') {
     try {
       const parentNode = await figma.getNodeByIdAsync(parentId)
       if (!parentNode) {
